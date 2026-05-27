@@ -748,32 +748,44 @@ export default function App(){
         input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
         input[type=number]{-moz-appearance:textfield;}
         select option{background:#0f1117;color:#eef0f4;}
+        select{-webkit-appearance:none;appearance:none;}
+        button{-webkit-tap-highlight-color:transparent;}
+        @media(max-width:640px){
+          .desktop-only{display:none!important;}
+          .mobile-nav{display:flex!important;}
+          .desktop-nav{display:none!important;}
+          .main-pad{padding:16px 12px 90px!important;}
+          .group-grid{grid-template-columns:1fr!important;}
+          .team-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .extras-grid{grid-template-columns:1fr!important;}
+          .summary-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .bracket-hint{display:block!important;}
+        }
+        @media(min-width:641px){
+          .mobile-nav{display:none!important;}
+          .mobile-only{display:none!important;}
+        }
       `}</style>
       <Confetti active={confetti}/>
 
-      {/* TOP BAR */}
-      <header style={{flexShrink:0,background:T.surface,borderBottom:`1px solid ${T.border}`,position:"sticky",top:0,zIndex:200}}>
-        <div style={{padding:"0 28px",display:"flex",alignItems:"center",gap:0,height:56}}>
-          {/* Logo */}
-          <div style={{display:"flex",alignItems:"center",gap:10,marginRight:32,flexShrink:0}}>
-            <span style={{fontSize:22,lineHeight:1}}>🏆</span>
+      {/* ── DESKTOP TOP BAR ── */}
+      <header className="desktop-nav" style={{flexShrink:0,background:T.surface,borderBottom:`1px solid ${T.border}`,position:"sticky",top:0,zIndex:200}}>
+        <div style={{padding:"0 24px",display:"flex",alignItems:"center",gap:0,height:54}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginRight:28,flexShrink:0}}>
+            <span style={{fontSize:20,lineHeight:1}}>🏆</span>
             <div>
               <div style={{fontSize:13,fontWeight:700,color:T.text,lineHeight:1.1,fontFamily:T.ffd}}>WC 2026</div>
               <div style={{fontSize:9,color:T.sub,letterSpacing:1.5,textTransform:"uppercase"}}>Predictor</div>
             </div>
           </div>
-
-          {/* Tabs */}
           <nav style={{display:"flex",gap:0,flex:1,overflowX:"auto",height:"100%"}}>
             {TABS.map(t=>(
               <button key={t.id} onClick={()=>setTab(t.id)} style={{
-                height:"100%",padding:"0 18px",border:"none",
+                height:"100%",padding:"0 16px",border:"none",
                 borderBottom:`3px solid ${tab===t.id?T.gold:"transparent"}`,
                 borderTop:"3px solid transparent",
-                background:"transparent",
-                color:tab===t.id?T.gold:T.sub,
-                fontFamily:T.ff,fontSize:"clamp(11px,1.2vw,13px)",
-                fontWeight:tab===t.id?600:400,
+                background:"transparent",color:tab===t.id?T.gold:T.sub,
+                fontFamily:T.ff,fontSize:13,fontWeight:tab===t.id?600:400,
                 cursor:"pointer",transition:"color .15s",whiteSpace:"nowrap",
                 display:"flex",alignItems:"center",gap:6,
               }}>
@@ -782,28 +794,66 @@ export default function App(){
               </button>
             ))}
           </nav>
-
-          {/* Right controls */}
-          <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:16,flexShrink:0}}>
-            <input
-              value={userName} onChange={e=>setUserName(e.target.value)}
-              placeholder="Your name"
-              style={{padding:"7px 12px",background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontFamily:T.ff,fontSize:12,width:130,outline:"none"}}
-            />
-            <button onClick={chaosMode} style={{padding:"7px 13px",border:`1px solid ${T.border}`,borderRadius:7,background:"transparent",color:T.sub,fontFamily:T.ff,fontSize:12,fontWeight:600,cursor:"pointer",transition:"all .15s",whiteSpace:"nowrap"}}>💀 Chaos</button>
-            <button onClick={()=>{setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");}} style={{padding:"7px 16px",border:"none",borderRadius:7,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Done ✓</button>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:12,flexShrink:0}}>
+            <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name"
+              style={{padding:"7px 12px",background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontFamily:T.ff,fontSize:12,width:120,outline:"none"}}/>
+            <button onClick={chaosMode} style={{padding:"7px 12px",border:`1px solid ${T.border}`,borderRadius:7,background:"transparent",color:T.sub,fontFamily:T.ff,fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>💀 Chaos</button>
+            <button onClick={()=>{setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");}} style={{padding:"7px 14px",border:"none",borderRadius:7,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Done ✓</button>
           </div>
         </div>
       </header>
 
-      {/* PAGE CONTENT — full width */}
-      <main style={{flex:1,padding:"28px 28px 80px",maxWidth:"100%",boxSizing:"border-box"}}>
+      {/* ── MOBILE TOP BAR ── */}
+      <header className="mobile-nav" style={{flexShrink:0,background:T.surface,borderBottom:`1px solid ${T.border}`,position:"sticky",top:0,zIndex:200,padding:"10px 14px",alignItems:"center",justifyContent:"space-between",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:20}}>🏆</span>
+          <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:T.ffd}}>WC 2026</div>
+        </div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name"
+            style={{padding:"6px 10px",background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontFamily:T.ff,fontSize:12,width:100,outline:"none"}}/>
+          <button onClick={()=>{setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");}} style={{padding:"6px 12px",border:"none",borderRadius:7,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:12,fontWeight:700,cursor:"pointer"}}>Done ✓</button>
+        </div>
+      </header>
+
+      {/* ── CONTENT ── */}
+      <main className="main-pad" style={{flex:1,padding:"24px 24px 80px",maxWidth:"100%",boxSizing:"border-box"}}>
         {tab==="groups"   && <GroupStage groupMatches={groupMatches} updateMatch={updateMatch}/>}
         {tab==="knockout" && <KnockoutStage bracket={bracket} setWinner={setWinner} setBracket={setBracket} groupMatches={groupMatches}/>}
         {tab==="extras"   && <ExtrasSection extras={extras} setExtras={setExtras}/>}
         {tab==="teams"    && <TeamsSection/>}
         {tab==="summary"  && <SummaryPage groupMatches={groupMatches} bracket={bracket} extras={extras} userName={userName}/>}
       </main>
+
+      {/* ── MOBILE BOTTOM TAB BAR ── */}
+      <nav className="mobile-nav" style={{
+        position:"fixed",bottom:0,left:0,right:0,zIndex:300,
+        background:T.surface,borderTop:`1px solid ${T.border}`,
+        display:"flex",alignItems:"stretch",
+        paddingBottom:"env(safe-area-inset-bottom)",
+      }}>
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{
+            flex:1,border:"none",background:"transparent",
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+            gap:3,padding:"8px 2px 6px",cursor:"pointer",
+            borderTop:`2px solid ${tab===t.id?T.gold:"transparent"}`,
+            transition:"all .15s",
+          }}>
+            <span style={{fontSize:18,lineHeight:1}}>{TAB_ICONS[t.id]}</span>
+            <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?T.gold:T.sub,letterSpacing:.3,fontFamily:T.ff,textTransform:"uppercase"}}>{t.label.split(" ")[0]}</span>
+          </button>
+        ))}
+        <button onClick={chaosMode} style={{
+          flex:1,border:"none",background:"transparent",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          gap:3,padding:"8px 2px 6px",cursor:"pointer",
+          borderTop:"2px solid transparent",
+        }}>
+          <span style={{fontSize:18,lineHeight:1}}>💀</span>
+          <span style={{fontSize:9,fontWeight:400,color:T.sub,letterSpacing:.3,fontFamily:T.ff,textTransform:"uppercase"}}>Chaos</span>
+        </button>
+      </nav>
     </div>
   );
 }
@@ -813,7 +863,7 @@ function GroupStage({groupMatches,updateMatch}){
   return(
     <div>
       <SectionHead label="Group Stage" sub="All 12 official groups — FIFA World Cup 2026. Enter your predicted scorelines and standings update live."/>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:18}}>
+      <div className="group-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:18}}>
         {Object.keys(WC_GROUPS).map(g=><GroupCard key={g} group={g} matches={groupMatches[g]} onUpdate={(i,f,v)=>updateMatch(g,i,f,v)}/>)}
       </div>
     </div>
@@ -847,7 +897,7 @@ function MatchRow({m,i,onUpdate}){
   return(
     <div style={{
       display:"flex",alignItems:"center",gap:0,
-      padding:"10px 14px",
+      padding:"10px 10px",
       background:T.raised,
       borderRadius:10,
       marginBottom:6,
@@ -925,15 +975,14 @@ function GroupCard({group,matches,onUpdate}){
 
       {/* Standings */}
       <div style={{borderTop:`1px solid ${T.border}`,background:T.card}}>
-        <div style={{padding:"8px 16px 4px",display:"flex",gap:0,fontSize:9,color:T.muted,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>
+        <div style={{padding:"6px 14px 3px",display:"flex",gap:0,fontSize:9,color:T.muted,letterSpacing:.8,textTransform:"uppercase",fontWeight:600}}>
           <span style={{flex:1}}>Team</span>
-          <span style={{width:20,textAlign:"center"}}>P</span>
-          <span style={{width:20,textAlign:"center"}}>W</span>
-          <span style={{width:20,textAlign:"center"}}>D</span>
-          <span style={{width:20,textAlign:"center"}}>L</span>
-          <span style={{width:24,textAlign:"center"}}>GD</span>
-          <span style={{width:28,textAlign:"right"}}>Pts</span>
-          <span style={{width:16}}/>
+          <span style={{width:18,textAlign:"center"}}>W</span>
+          <span style={{width:18,textAlign:"center"}}>D</span>
+          <span style={{width:18,textAlign:"center"}}>L</span>
+          <span style={{width:22,textAlign:"center"}}>GD</span>
+          <span style={{width:26,textAlign:"right"}}>Pts</span>
+          <span style={{width:14}}/>
         </div>
         {standings.map((t,i)=>{
           const qualified=i<2,third=i===2;
@@ -956,12 +1005,11 @@ function GroupCard({group,matches,onUpdate}){
                 <Flag team={t.name} size={18} radius={3}/>
                 <span style={{fontSize:12,fontWeight:qualified?600:400,color:qualified?T.text:T.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{teamName(t.name)}</span>
               </div>
-              <span style={{width:20,textAlign:"center",fontSize:11,color:T.muted}}>{t.p}</span>
-              <span style={{width:20,textAlign:"center",fontSize:11,color:T.muted}}>{t.w}</span>
-              <span style={{width:20,textAlign:"center",fontSize:11,color:T.muted}}>{t.d}</span>
-              <span style={{width:20,textAlign:"center",fontSize:11,color:T.muted}}>{t.l}</span>
-              <span style={{width:24,textAlign:"center",fontSize:11,color:t.gd>0?T.green:t.gd<0?T.red:T.muted,fontWeight:t.gd!==0?600:400}}>{t.gd>0?"+"+t.gd:t.gd}</span>
-              <span style={{width:28,textAlign:"right",fontSize:12,fontWeight:700,color:qualified?T.text:T.sub}}>{t.pts}</span>
+              <span style={{width:18,textAlign:"center",fontSize:11,color:T.muted}}>{t.w}</span>
+              <span style={{width:18,textAlign:"center",fontSize:11,color:T.muted}}>{t.d}</span>
+              <span style={{width:18,textAlign:"center",fontSize:11,color:T.muted}}>{t.l}</span>
+              <span style={{width:22,textAlign:"center",fontSize:11,color:t.gd>0?T.green:t.gd<0?T.red:T.muted,fontWeight:t.gd!==0?600:400}}>{t.gd>0?"+"+t.gd:t.gd}</span>
+              <span style={{width:26,textAlign:"right",fontSize:12,fontWeight:700,color:qualified?T.text:T.sub}}>{t.pts}</span>
               <span style={{width:16,textAlign:"right"}}>
                 {qualified?<span style={{fontSize:8,color:T.green,fontWeight:700,background:T.greenBg,padding:"1px 4px",borderRadius:3}}>Q</span>
                 :third?<span style={{fontSize:8,color:T.blue,fontWeight:700,background:"rgba(96,165,250,0.1)",padding:"1px 4px",borderRadius:3}}>3</span>
@@ -1071,9 +1119,23 @@ function KnockoutStage({bracket,setWinner,setBracket,groupMatches}){
         </button>
       </div>
 
-      <div style={{overflowX:"auto",paddingBottom:12}}>
-        <div style={{display:"flex",gap:16,alignItems:"flex-start",minWidth:960,padding:"4px 0"}}>
-          <div style={{flex:2.2}}>
+      {/* Mobile hint */}
+      <div className="bracket-hint" style={{display:"none",marginBottom:16,padding:"10px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,color:T.sub}}>
+        📱 Scroll right to see the full bracket, or use the round buttons below to jump to each stage.
+      </div>
+
+      {/* Mobile round jump buttons */}
+      <div className="mobile-only" style={{display:"flex",gap:6,marginBottom:16,overflowX:"auto",paddingBottom:4}}>
+        {[["r32","R32"],["qf","QF"],["sf","SF"],["f","Final"]].map(([id,lbl])=>(
+          <a key={id} href={`#bracket-${id}`} style={{padding:"6px 14px",border:`1px solid ${T.border}`,borderRadius:20,background:T.card,color:T.sub,fontSize:11,fontWeight:600,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+            {lbl}
+          </a>
+        ))}
+      </div>
+
+      <div style={{overflowX:"auto",paddingBottom:12,WebkitOverflowScrolling:"touch"}}>
+        <div style={{display:"flex",gap:14,alignItems:"flex-start",minWidth:900,padding:"4px 0"}}>
+          <div style={{flex:2.2}} id="bracket-r32">
             <RoundLabel>Round of 32</RoundLabel>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               {bracket.r16.map((m,i)=>{
@@ -1106,19 +1168,19 @@ function KnockoutStage({bracket,setWinner,setBracket,groupMatches}){
               })}
             </div>
           </div>
-          <div style={{flex:1.5}}>
+          <div style={{flex:1.5}} id="bracket-qf">
             <RoundLabel>Quarter-Finals</RoundLabel>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {bracket.qf.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("qf",i,w)}/>)}
             </div>
           </div>
-          <div style={{flex:1}}>
+          <div style={{flex:1}} id="bracket-sf">
             <RoundLabel>Semi-Finals</RoundLabel>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {bracket.sf.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("sf",i,w)}/>)}
             </div>
           </div>
-          <div style={{flex:.9}}>
+          <div style={{flex:.9}} id="bracket-f">
             <RoundLabel gold>Final</RoundLabel>
             {bracket.final.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("final",i,w)} isFinal/>)}
             <div style={{height:1,background:T.border,margin:"16px 0 8px"}}/>
@@ -1149,7 +1211,7 @@ function ExtrasSection({extras,setExtras}){
   return(
     <div>
       <SectionHead label="Extra Predictions"/>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+      <div className="extras-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
         <div style={fw}>
           <span style={lbl}>World Cup Champion</span>
           <select style={inp} value={extras.champion} onChange={e=>upd("champion",e.target.value)}>
@@ -1205,7 +1267,7 @@ function TeamsSection(){
         ))}
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:sel?20:0}}>
+      <div className="team-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:sel?20:0}}>
         {filtered.map(t=>(
           <div key={t} onClick={()=>setSel(sel===t?null:t)} style={{background:sel===t?T.raised:T.surface,border:`1px solid ${sel===t?T.borderHi:T.border}`,borderRadius:10,padding:"14px 12px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,transition:"all .15s"}}>
             <Flag team={t} size={36} radius={4}/>
@@ -1226,8 +1288,8 @@ function TeamsSection(){
                   <div style={{fontSize:12,color:T.sub,marginTop:2}}>{sq.coach} · {sq.formation} · FIFA Rank #{sq.ranking}</div>
                 </div>
               </div>
-              <div style={{display:"flex",flexWrap:"wrap"}}>
-                <div style={{flex:1,minWidth:240,padding:"18px 22px"}}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:0}}>
+                <div style={{flex:1,minWidth:220,padding:"16px 18px"}}>
 
                   {sq.uncertain.length>0&&(
                     <div style={{background:"rgba(243,156,18,0.08)",border:"1px solid rgba(243,156,18,0.2)",borderRadius:8,padding:"10px 14px",marginBottom:16}}>
@@ -1592,9 +1654,9 @@ function SummaryPage({groupMatches,bracket,extras,userName}){
       )}
 
       {/* Page header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:14,marginBottom:28}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:28}}>
         <SectionHead label="Prediction Summary" sub="Your complete World Cup 2026 predictions at a glance."/>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginTop:4}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginTop:4,width:"100%",justifyContent:"flex-end"}}>
           <button
             onClick={generateShareImage}
             disabled={sharing}
@@ -1642,7 +1704,7 @@ function SummaryPage({groupMatches,bracket,extras,userName}){
           )}
           <div style={{marginBottom:24}}>
             <div style={{fontSize:11,letterSpacing:2,color:T.sub,textTransform:"uppercase",fontWeight:600,marginBottom:14}}>Group Stage</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+            <div className="summary-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
               {Object.keys(WC_GROUPS).map(g=>{
                 const st=computeStandings(WC_GROUPS[g].teams,groupMatches[g]);
                 return(
@@ -1689,7 +1751,7 @@ function SummaryPage({groupMatches,bracket,extras,userName}){
           )}
           <div style={{marginTop:24,paddingTop:16,borderTop:`1px solid ${T.border}`,fontSize:10,color:"rgba(255,255,255,0.12)",letterSpacing:1.5,display:"flex",justifyContent:"space-between"}}>
             <span>WORLD CUP 2026 PREDICTION GENERATOR</span>
-            <span>{userName?userName.toUpperCase():"ANDY"}</span>
+            <span>{userName?userName.toUpperCase():"ANONYMOUS"}</span>
           </div>
         </div>
       </div>
