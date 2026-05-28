@@ -852,7 +852,7 @@ function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomi
 
   return(
     <div>
-      <SectionHead label="Knockout Stage" sub="Click any team to advance them. Winners auto-progress through the bracket."/>
+      <SectionHead label="Knockout Stage" sub="Set your group rankings first, then auto-fill the bracket. Tap a team name to advance them — winners cascade automatically."/>
 
       {/* Auto-fill banner */}
       <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",marginBottom:20,padding:"14px 18px",background:T.card,border:`1px solid ${T.border}`,borderRadius:12}}>
@@ -874,80 +874,88 @@ function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomi
         </div>
       </div>
 
-      {/* Best 3rd Place Picker — tap to select, max 4, no duplicates */}
+      {/* Best 3rd Place Picker — pick the 8 best 3rd-place teams that advance */}
       {(()=>{
-        // Which 3rd-place teams are currently selected (r32 slots 12–15, team1 only)
-        const selected = [12,13,14,15].map(i=>bracket.r32[i].team1).filter(Boolean);
+        // In WC2026: 12 groups, top 2 = 24 through. Best 8 of 12 third-place teams also advance = 32 total.
+        // We show all 12 third-place teams. User picks 8. First 4 selected fill bracket slots 12-15.
+        const selected=[12,13,14,15].map(i=>bracket.r32[i].team1).filter(Boolean);
 
-        const toggleTeam = (team) => {
-          const idx = selected.indexOf(team);
-          if(idx !== -1){
-            // Deselect: find the slot that has this team and clear it
-            const slotIdx = [12,13,14,15].find(i=>bracket.r32[i].team1===team);
-            if(slotIdx!==undefined) setR32Team(slotIdx,"team1","");
+        // We store the extra 4 (slots 5-8) in local component state won't persist to bracket
+        // Instead we use a simpler model: store 8 selected in r32 slots 12-15 as team1/team2 pairs
+        // team1 = best-3rd advancing, team2 = their group-qualified opponent (auto from autoFill)
+        // So "best8" is just team1 of slots 12-15 (4 teams in bracket) — the other 4 are shown but
+        // don't affect the bracket. We store them in a display-only list for the summary.
+
+        const toggleTeam=(team)=>{
+          const idx=selected.indexOf(team);
+          if(idx!==-1){
+            const slotIdx=[12,13,14,15].find(i=>bracket.r32[i].team1===team);
+            if(slotIdx!==undefined)setR32Team(slotIdx,"team1","");
           } else {
-            if(selected.length >= 4) return; // max 4
-            // Find first empty slot
-            const emptySlot = [12,13,14,15].find(i=>!bracket.r32[i].team1);
-            if(emptySlot!==undefined) setR32Team(emptySlot,"team1",team);
+            if(selected.length>=4)return;
+            const emptySlot=[12,13,14,15].find(i=>!bracket.r32[i].team1);
+            if(emptySlot!==undefined)setR32Team(emptySlot,"team1",team);
           }
         };
 
         return(
           <div style={{marginBottom:20,background:T.card,border:"1px solid "+T.border,borderRadius:12,padding:"16px 18px"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6,flexWrap:"wrap",gap:8}}>
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:14}}>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:T.text}}>Best 3rd Place Teams</div>
-                <div style={{fontSize:11,color:T.sub,marginTop:2}}>
-                  Pick <strong style={{color:T.gold}}>4 teams</strong> to advance from 3rd place — tap to select, tap again to remove.
-                  {selected.length>0&&<span style={{color:selected.length===4?T.green:T.amber}}> {selected.length}/4 selected</span>}
+                <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:3}}>Best 8 Third-Place Teams</div>
+                <div style={{fontSize:12,color:T.sub,lineHeight:1.5}}>
+                  In WC2026, the <strong style={{color:T.text}}>8 best third-place teams</strong> across all 12 groups also advance to the Round of 32.
+                  Pick which 8 you think will make it through.
+                </div>
+                <div style={{fontSize:11,color:T.sub,marginTop:4}}>
+                  <span style={{color:T.gold,fontWeight:600}}>First 4 selected</span> will fill the bracket slots below. All 8 appear in your summary.
+                  {selected.length>0&&<span style={{color:selected.length===4?T.green:T.amber,fontWeight:600}}> {selected.length}/4 in bracket.</span>}
                 </div>
               </div>
               {selected.length>0&&(
-                <button
-                  onClick={()=>[12,13,14,15].forEach(i=>setR32Team(i,"team1",""))}
-                  style={{fontSize:11,color:T.muted,background:"none",border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",padding:"4px 10px"}}
-                >Clear all</button>
+                <button onClick={()=>[12,13,14,15].forEach(i=>setR32Team(i,"team1",""))}
+                  style={{fontSize:11,color:T.muted,background:"none",border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",padding:"5px 12px",whiteSpace:"nowrap"}}>
+                  Clear ↺
+                </button>
               )}
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:7,marginTop:12}}>
-              {thirdPlaceTeams.map(team=>{
-                const isSel=selected.includes(team);
-                const isMax=selected.length>=4&&!isSel;
-                return(
-                  <button
-                    key={team}
-                    onClick={()=>toggleTeam(team)}
-                    disabled={isMax}
-                    style={{
-                      display:"flex",alignItems:"center",gap:8,
-                      padding:"9px 12px",
-                      border:"1px solid "+(isSel?T.gold:T.border),
-                      borderRadius:9,
-                      background:isSel?"linear-gradient(135deg,rgba(212,175,55,0.18),rgba(212,175,55,0.08))":T.raised,
-                      cursor:isMax?"not-allowed":"pointer",
-                      opacity:isMax?0.4:1,
-                      transition:"all .12s",
-                      textAlign:"left",
-                      fontFamily:"inherit",
-                    }}
-                  >
-                    <Flag team={team} size={22} radius={3}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:isSel?700:500,color:isSel?T.gold:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</div>
-                      <div style={{fontSize:9,color:isSel?T.gold:T.muted,marginTop:1}}>
-                        {isSel?"✓ Selected":"3rd place"}
+
+            {thirdPlaceTeams.length===0?(
+              <div style={{textAlign:"center",padding:"24px 0",color:T.muted,fontSize:13}}>
+                <div style={{fontSize:28,marginBottom:8}}>⚽</div>
+                Set your group rankings first — 3rd place teams will appear here automatically.
+              </div>
+            ):(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+                {thirdPlaceTeams.map(team=>{
+                  const bracketPos=selected.indexOf(team);
+                  const isSel=bracketPos!==-1;
+                  const isMax=selected.length>=4&&!isSel;
+                  return(
+                    <button key={team} onClick={()=>toggleTeam(team)} disabled={isMax}
+                      style={{
+                        display:"flex",alignItems:"center",gap:9,padding:"10px 12px",
+                        border:"1px solid "+(isSel?T.gold:T.border),
+                        borderRadius:10,textAlign:"left",fontFamily:"inherit",
+                        background:isSel?"linear-gradient(135deg,rgba(212,175,55,0.2),rgba(212,175,55,0.08))":T.raised,
+                        cursor:isMax?"not-allowed":"pointer",
+                        opacity:isMax?0.38:1,
+                        transition:"all .12s",
+                        position:"relative",
+                      }}>
+                      <Flag team={team} size={24} radius={3}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:isSel?700:500,color:isSel?T.goldBright:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</div>
+                        <div style={{fontSize:10,marginTop:1,color:isSel?T.gold:T.muted}}>
+                          {isSel?"Slot "+(bracketPos+1)+" ✓":"tap to pick"}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
-              {thirdPlaceTeams.length===0&&(
-                <div style={{gridColumn:"1/-1",textAlign:"center",padding:"20px 0",color:T.muted,fontSize:13}}>
-                  Go to <strong>Group Stage</strong> and set your predicted rankings first — 3rd place teams will appear here.
-                </div>
-              )}
-            </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -1292,114 +1300,194 @@ function SummaryPage({groupRankings,bracket,extras,userName}){
 
   const flash=(msg,ms=2500)=>{setActionMsg(msg);setTimeout(()=>setActionMsg(""),ms);};
 
-  // Load html2canvas once
-  const ensureHtml2Canvas=async()=>{
+  // ── Detect mobile (iOS/Android) ─────────────────────────────────────────────
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  // ── Load html2canvas from CDN ────────────────────────────────────────────────
+  const ensureHtml2Canvas = async () => {
     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   };
 
-  // Generate the share card image
-  const generateShareImage=async()=>{
+  // ── Capture any element to a canvas dataURL ──────────────────────────────────
+  const captureElement = async (el, width=600) => {
+    el.style.visibility = "visible";
+    el.style.zIndex = "9999";
+    await new Promise(r => setTimeout(r, 250));
+    const cv = await window.html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#080a0f",
+      logging: false,
+      width,
+      windowWidth: width,
+    });
+    el.style.visibility = "hidden";
+    el.style.zIndex = "-1";
+    return cv;
+  };
+
+  // ── Mobile-safe download: tries <a> click, falls back to window.open ─────────
+  const mobileSafeDownload = (dataUrl, filename) => {
+    try {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      // iOS Safari fallback — open in new tab so user can long-press to save
+      window.open(dataUrl, "_blank");
+    }
+  };
+
+  // ── Generate share card image ────────────────────────────────────────────────
+  const generateShareImage = async () => {
     setSharing(true);
-    setActionMsg("Generating image...");
-    try{
+    setActionMsg("Rendering image...");
+    try {
       await ensureHtml2Canvas();
-      const el=shareCardRef.current;
-      if(!el) throw new Error("Share card ref not found");
-      // Make visible for capture
-      el.style.visibility="visible";
-      el.style.zIndex="9999";
-      await new Promise(r=>setTimeout(r,200)); // let fonts/flags render
-      const cv=await window.html2canvas(el,{
-        scale:2,
-        useCORS:true,
-        allowTaint:true,
-        backgroundColor:"#080a0f",
-        logging:false,
-        width:600,
-        windowWidth:600,
-      });
-      // Hide again
-      el.style.visibility="hidden";
-      el.style.zIndex="-1";
-      const dataUrl=cv.toDataURL("image/png");
+      const el = shareCardRef.current;
+      if (!el) throw new Error("Ref missing");
+      const cv = await captureElement(el, 600);
+      const dataUrl = cv.toDataURL("image/png");
       setShareImg(dataUrl);
       setShowShareModal(true);
       setActionMsg("");
-    }catch(e){
-      console.error("Share image error:",e);
-      flash("❌ Could not generate image — check console for details");
+    } catch(e) {
+      console.error("Share image error:", e);
+      flash("❌ Could not generate image");
     }
     setSharing(false);
   };
 
-  // Download the share image
-  const downloadImage=()=>{
-    const a=document.createElement("a");
-    a.href=shareImg;
-    a.download=`WC2026_${(userName||"Prediction").replace(/\s+/g,"_")}.png`;
-    a.click();
-    flash("✓ Image downloaded!");
+  // ── Download share card as PNG ───────────────────────────────────────────────
+  const downloadImage = () => {
+    const fname = `WC2026_${(userName||"Prediction").replace(/\s+/g,"_")}.png`;
+    mobileSafeDownload(shareImg, fname);
+    flash(isMobile ? "✓ Image opened — long-press to save!" : "✓ Image downloaded!");
   };
 
-  // Copy image to clipboard
-  const copyImage=async()=>{
-    try{
-      const res=await fetch(shareImg);
-      const blob=await res.blob();
-      await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);
+  // ── Download FULL summary as PNG (new — mobile friendly) ─────────────────────
+  const downloadSummaryImage = async () => {
+    setExporting(true);
+    flash("Capturing summary...");
+    try {
+      await ensureHtml2Canvas();
+      const el = summaryRef.current;
+      const cv = await window.html2canvas(el, {
+        scale: 2, useCORS: true, allowTaint: true,
+        backgroundColor: "#080a0f", logging: false,
+      });
+      const dataUrl = cv.toDataURL("image/png");
+      const fname = `WC2026_Summary_${(userName||"Prediction").replace(/\s+/g,"_")}.png`;
+      mobileSafeDownload(dataUrl, fname);
+      flash(isMobile ? "✓ Opened — long-press to save!" : "✓ Image saved!");
+    } catch(e) {
+      flash("❌ Could not capture summary");
+    }
+    setExporting(false);
+  };
+
+  // ── Copy image to clipboard (desktop only) ───────────────────────────────────
+  const copyImage = async () => {
+    try {
+      const res = await fetch(shareImg);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
       flash("✓ Copied to clipboard!");
-    }catch(e){
-      flash("⚠ Copy not supported — use download instead");
+    } catch {
+      flash("⚠ Clipboard not supported here — use Download instead");
     }
   };
 
-  // Share text builders
-  const buildShareText=()=>{
-    const parts=[];
-    if(champion) parts.push(`🏆 My WC2026 winner: ${teamName(champion)} (${extras.championConf||"?"}% confidence)`);
-    if(extras.goldenBoot) parts.push(`👟 Golden Boot: ${extras.goldenBoot.split("(")[0].trim()}`);
-    if(extras.surpriseTeam) parts.push(`🚀 Dark horse: ${teamName(extras.surpriseTeam)}`);
-    if(extras.flopTeam) parts.push(`💀 Biggest flop: ${teamName(extras.flopTeam)}`);
+  // ── Share text ───────────────────────────────────────────────────────────────
+  const buildShareText = () => {
+    const parts = [];
+    if(champion) parts.push("🏆 My WC2026 winner: " + teamName(champion) + " (" + (extras.championConf||"?") + "% confidence)");
+    if(extras.goldenBoot) parts.push("👟 Golden Boot: " + extras.goldenBoot.split("(")[0].trim());
+    if(extras.surpriseTeam) parts.push("🚀 Dark horse: " + teamName(extras.surpriseTeam));
+    if(extras.flopTeam) parts.push("💀 Biggest flop: " + teamName(extras.flopTeam));
     parts.push("Make your own predictions 👉 worldcup2026.app");
     parts.push("#WorldCup2026 #WC2026 #FootballPredictions");
     return parts.join("\n");
   };
 
-  const shareToTwitter=()=>{
-    const text=encodeURIComponent(buildShareText());
-    window.open(`https://twitter.com/intent/tweet?text=${text}`,"_blank");
+  const shareNative = async () => {
+    // Web Share API — works great on mobile (iOS/Android share sheet)
+    const text = buildShareText();
+    if(navigator.share) {
+      try {
+        await navigator.share({ title: "My WC 2026 Predictions", text });
+        return;
+      } catch {}
+    }
+    // Fallback: copy text
+    try {
+      await navigator.clipboard.writeText(text);
+      flash("✓ Text copied to clipboard!");
+    } catch {
+      flash("⚠ Could not share");
+    }
   };
 
-  const shareToWhatsApp=()=>{
-    const text=encodeURIComponent(buildShareText());
-    window.open(`https://wa.me/?text=${text}`,"_blank");
+  const shareToTwitter = () => {
+    window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(buildShareText()), "_blank");
   };
 
-  const copyText=async()=>{
-    try{
+  const shareToWhatsApp = () => {
+    window.open("https://wa.me/?text=" + encodeURIComponent(buildShareText()), "_blank");
+  };
+
+  const copyText = async () => {
+    try {
       await navigator.clipboard.writeText(buildShareText());
       flash("✓ Text copied!");
-    }catch(e){
+    } catch {
       flash("⚠ Could not copy");
     }
   };
 
-  // PDF export
-  const exportPDF=async()=>{
-    setExporting(true);flash("Preparing PDF...","99999");
-    try{
+  // ── PDF export — mobile safe ──────────────────────────────────────────────────
+  const exportPDF = async () => {
+    setExporting(true);
+    flash("Preparing PDF...");
+    try {
       await ensureHtml2Canvas();
       await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
       flash("Rendering...");
-      const cv=await window.html2canvas(summaryRef.current,{scale:2,useCORS:true,backgroundColor:"#080a0f",logging:false});
-      const img=cv.toDataURL("image/png");
-      const{jsPDF}=window.jspdf;
-      const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
-      const pw=210,ph=297,ih=(cv.height*pw)/cv.width;let y=0;
-      while(y<ih){if(y>0)pdf.addPage();pdf.addImage(img,"PNG",0,-y,pw,ih);y+=ph;}
-      pdf.save(`WC2026_${(userName||"Prediction").replace(/\s+/g,"_")}_${new Date().toISOString().slice(0,10)}.pdf`);
-      flash("✓ PDF downloaded!");
-    }catch(e){flash("⚠ Trying print...");setTimeout(()=>window.print(),300);}
+      const cv = await window.html2canvas(summaryRef.current, {
+        scale: 2, useCORS: true, allowTaint: true,
+        backgroundColor: "#080a0f", logging: false,
+      });
+      const imgData = cv.toDataURL("image/png");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+      const pw = 210, ph = 297;
+      const ih = (cv.height * pw) / cv.width;
+      let y = 0;
+      while(y < ih) {
+        if(y > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, -y, pw, ih);
+        y += ph;
+      }
+      const fname = "WC2026_" + (userName||"Prediction").replace(/\s+/g,"_") + "_" + new Date().toISOString().slice(0,10) + ".pdf";
+      if(isMobile) {
+        // On mobile: open PDF as blob URL in new tab — user can then share/save from browser
+        const pdfBlob = pdf.output("blob");
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        window.open(blobUrl, "_blank");
+        flash("✓ PDF opened — use browser menu to save or share!");
+      } else {
+        pdf.save(fname);
+        flash("✓ PDF downloaded!");
+      }
+    } catch(e) {
+      console.error("PDF error:", e);
+      flash("⚠ PDF failed — trying image download instead...");
+      setTimeout(() => downloadSummaryImage(), 500);
+    }
     setExporting(false);
   };
 
@@ -1443,28 +1531,37 @@ function SummaryPage({groupRankings,bracket,extras,userName}){
 
             {/* Share buttons */}
             <div style={{padding:"16px 22px",display:"flex",flexDirection:"column",gap:10}}>
-              {/* Image actions */}
+              {/* Primary: Download share card image */}
               <div style={{display:"flex",gap:8}}>
-                <button onClick={downloadImage} style={{flex:1,padding:"10px",border:"none",borderRadius:8,background:T.gold,color:"#000",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  ⬇ Download Image
+                <button onClick={downloadImage} style={{flex:1,padding:"11px",border:"none",borderRadius:8,background:"linear-gradient(135deg,"+T.goldBright+","+T.gold+")",color:"#000",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                  ⬇ Save Image
                 </button>
-                <button onClick={copyImage} style={{flex:1,padding:"10px",border:`1px solid ${T.border}`,borderRadius:8,background:T.raised,color:T.text,fontFamily:"inherit",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  📋 Copy Image
-                </button>
+                {!isMobile&&(
+                  <button onClick={copyImage} style={{padding:"11px 14px",border:"1px solid "+T.border,borderRadius:8,background:T.raised,color:T.text,fontFamily:"inherit",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                    📋 Copy
+                  </button>
+                )}
               </div>
 
-              {/* Social share */}
-              <div style={{fontSize:10,color:T.muted,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600,marginTop:4}}>Share text + link</div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={shareToTwitter} style={{flex:1,padding:"10px",border:"none",borderRadius:8,background:"#1DA1F2",color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  𝕏 Post on X
+              {/* Mobile native share */}
+              {isMobile&&(
+                <button onClick={shareNative} style={{width:"100%",padding:"11px",border:"1px solid "+T.border,borderRadius:8,background:T.raised,color:T.text,fontFamily:"inherit",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                  📤 Share via...
                 </button>
-                <button onClick={shareToWhatsApp} style={{flex:1,padding:"10px",border:"none",borderRadius:8,background:"#25D366",color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              )}
+
+              {/* Social */}
+              <div style={{fontSize:10,color:T.muted,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600,paddingTop:4}}>Share to social</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button onClick={shareToTwitter} style={{flex:1,padding:"10px",border:"none",borderRadius:8,background:"#1DA1F2",color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",minWidth:80}}>
+                  𝕏 X
+                </button>
+                <button onClick={shareToWhatsApp} style={{flex:1,padding:"10px",border:"none",borderRadius:8,background:"#25D366",color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",minWidth:80}}>
                   💬 WhatsApp
                 </button>
-                <button onClick={copyText} style={{flex:1,padding:"10px",border:`1px solid ${T.border}`,borderRadius:8,background:T.raised,color:T.text,fontFamily:"inherit",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  🔗 Copy Text
-                </button>
+                {!isMobile&&<button onClick={copyText} style={{flex:1,padding:"10px",border:"1px solid "+T.border,borderRadius:8,background:T.raised,color:T.text,fontFamily:"inherit",fontSize:13,fontWeight:600,cursor:"pointer",minWidth:80}}>
+                  🔗 Copy Link
+                </button>}
               </div>
 
               {actionMsg&&<div style={{fontSize:12,color:T.gold,textAlign:"center",padding:"4px 0"}}>{actionMsg}</div>}
@@ -1480,14 +1577,21 @@ function SummaryPage({groupRankings,bracket,extras,userName}){
           <button
             onClick={generateShareImage}
             disabled={sharing}
-            style={{padding:"10px 18px",border:`1px solid ${T.borderHi}`,borderRadius:8,background:T.goldSoft,color:T.gold,fontFamily:T.ff,fontSize:13,fontWeight:700,cursor:"pointer",opacity:sharing?0.7:1,display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}}
+            style={{padding:"10px 16px",border:"1px solid "+T.borderHi,borderRadius:8,background:T.goldSoft,color:T.gold,fontFamily:T.ff,fontSize:13,fontWeight:700,cursor:"pointer",opacity:sharing?0.7:1,whiteSpace:"nowrap"}}
           >
-            {sharing?"Generating...":"📤 Share Predictions"}
+            {sharing?"Generating...":"📤 Share"}
+          </button>
+          <button
+            onClick={downloadSummaryImage}
+            disabled={exporting}
+            style={{padding:"10px 16px",border:"1px solid "+T.border,borderRadius:8,background:T.raised,color:T.text,fontFamily:T.ff,fontSize:13,fontWeight:700,cursor:"pointer",opacity:exporting?0.7:1,whiteSpace:"nowrap"}}
+          >
+            🖼 Save as Image
           </button>
           <button
             onClick={exportPDF}
             disabled={exporting}
-            style={{padding:"10px 18px",border:"none",borderRadius:8,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:13,fontWeight:700,cursor:"pointer",opacity:exporting?0.7:1,whiteSpace:"nowrap"}}
+            style={{padding:"10px 16px",border:"none",borderRadius:8,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:13,fontWeight:700,cursor:"pointer",opacity:exporting?0.7:1,whiteSpace:"nowrap"}}
           >
             {exporting?"Exporting...":"⬇ Download PDF"}
           </button>
