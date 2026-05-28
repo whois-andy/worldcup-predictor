@@ -36,14 +36,50 @@ function teamName(raw) {
   return raw.replace(/^[\p{Emoji_Presentation}\p{Emoji}\s]+/u,"").trim();
 }
 
+// Country name → emoji flag (Unicode regional indicators, always work offline)
+const FLAG_EMOJI = {
+  "Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Czechia":"🇨🇿",
+  "Canada":"🇨🇦","Bosnia-Herzegovina":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
+  "Brazil":"🇧🇷","Haiti":"🇭🇹","Morocco":"🇲🇦","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷",
+  "Germany":"🇩🇪","Curaçao":"🇨🇼","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨",
+  "Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳",
+  "Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿",
+  "Spain":"🇪🇸","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦","Uruguay":"🇺🇾",
+  "France":"🇫🇷","Iraq":"🇮🇶","Norway":"🇳🇴","Senegal":"🇸🇳",
+  "Argentina":"🇦🇷","Algeria":"🇩🇿","Austria":"🇦🇹","Jordan":"🇯🇴",
+  "Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿","Colombia":"🇨🇴",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+};
+
 function Flag({ team, size=24, radius=3 }) {
   const code = getCode(team);
+  const name = teamName(team);
+  const emoji = FLAG_EMOJI[name] || "🏳️";
+  const [imgOk, setImgOk] = React.useState(true);
+
+  // Use img from flagcdn, fall back to emoji span if it fails
+  if(!imgOk){
+    return(
+      <span style={{
+        display:"inline-flex", alignItems:"center", justifyContent:"center",
+        flexShrink:0, fontSize:size*0.9, lineHeight:1,
+        width:size, textAlign:"center",
+      }}>{emoji}</span>
+    );
+  }
   return (
     <img
-      src={`https://flagcdn.com/w${size*2}/${code}.png`}
-      alt={team}
-      style={{ width:size, height:size*0.67, borderRadius:radius, objectFit:"cover", flexShrink:0, display:"inline-block", boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }}
-      onError={e => { e.target.style.display="none"; }}
+      src={`https://flagcdn.com/w${Math.max(size*2,48)}/${code}.png`}
+      alt={name}
+      style={{
+        width:size, height:Math.round(size*0.67),
+        borderRadius:radius, objectFit:"cover",
+        flexShrink:0, display:"inline-block",
+        boxShadow:"0 1px 3px rgba(0,0,0,0.4)",
+        verticalAlign:"middle",
+      }}
+      onError={()=>setImgOk(false)}
     />
   );
 }
@@ -466,48 +502,7 @@ const SQUADS = {
   },
 };
 
-// ─── MATCH GENERATION ────────────────────────────────────────────────────────
-function getGroupMatches(g) {
-  const t=WC_GROUPS[g].teams, ms=[];
-  for(let i=0;i<t.length;i++)
-    for(let j=i+1;j<t.length;j++)
-      ms.push({home:t[i],away:t[j],homeGoals:"",awayGoals:""});
-  return ms;
-}
-function computeStandings(teams,matches){
-  const tb={};
-  teams.forEach(t=>{tb[t]={p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0};});
-  matches.forEach(m=>{
-    const hg=parseInt(m.homeGoals),ag=parseInt(m.awayGoals);
-    if(isNaN(hg)||isNaN(ag))return;
-    tb[m.home].p++;tb[m.away].p++;
-    tb[m.home].gf+=hg;tb[m.home].ga+=ag;
-    tb[m.away].gf+=ag;tb[m.away].ga+=hg;
-    if(hg>ag){tb[m.home].w++;tb[m.home].pts+=3;tb[m.away].l++;}
-    else if(hg<ag){tb[m.away].w++;tb[m.away].pts+=3;tb[m.home].l++;}
-    else{tb[m.home].d++;tb[m.home].pts++;tb[m.away].d++;tb[m.away].pts++;}
-  });
-  return Object.entries(tb).map(([name,s])=>({name,...s,gd:s.gf-s.ga}))
-    .sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
-}
-
-// ─── BRACKET ─────────────────────────────────────────────────────────────────
-const R16_LABELS=[
-  "1A vs 2B","1C vs 2D","1E vs 2F","1G vs 2H","1I vs 2J","1K vs 2L",
-  "1B vs 2A","1D vs 2C","1F vs 2E","1H vs 2G","1J vs 2I","1L vs 2K",
-  "Best 3rd α","Best 3rd β","Best 3rd γ","Best 3rd δ",
-];
-function emptyBracket(){
-  return{
-    r16:R16_LABELS.map((label,i)=>({id:`r16_${i}`,label,team1:"",team2:"",winner:""})),
-    qf:Array.from({length:8},(_,i)=>({id:`qf_${i}`,label:`QF ${i+1}`,team1:"",team2:"",winner:""})),
-    sf:Array.from({length:4},(_,i)=>({id:`sf_${i}`,label:`SF ${i+1}`,team1:"",team2:"",winner:""})),
-    final:[{id:"final",label:"The Final",team1:"",team2:"",winner:""}],
-    third:[{id:"third",label:"3rd Place",team1:"",team2:"",winner:""}],
-  };
-}
-
-// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
+// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
 const T={
   bg:"#080a0f",surface:"#0f1117",raised:"#161a22",card:"#1c2030",
   border:"rgba(255,255,255,0.06)",borderHi:"rgba(212,175,55,0.4)",
@@ -517,7 +512,8 @@ const T={
   red:"#f87171",redBg:"rgba(248,113,113,0.1)",
   amber:"#fbbf24",amberBg:"rgba(251,191,36,0.1)",
   blue:"#60a5fa",
-  ff:"'DM Sans','Inter',system-ui,sans-serif",ffd:"'Playfair Display','Georgia',serif",
+  ff:"'DM Sans','Inter',system-ui,sans-serif",
+  ffd:"'Playfair Display','Georgia',serif",
 };
 
 // ─── CONFETTI ─────────────────────────────────────────────────────────────────
@@ -557,24 +553,69 @@ function Confetti({active}){
 }
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
+// ─── PROGRESS TRACKER ────────────────────────────────────────────────────────
+function ProgressBar({groupRankings,bracket,extras}){
+  const defaultR=Object.keys(WC_GROUPS).reduce((a,g)=>({...a,[g]:[...WC_GROUPS[g].teams]}),{});
+  const groupsDone=Object.keys(WC_GROUPS).filter(g=>groupRankings[g].some((t,i)=>t!==defaultR[g][i])).length;
+  const r32Done=bracket.r32.filter(m=>m.winner).length;
+  const r16Done=bracket.r16.filter(m=>m.winner).length;
+  const qfDone=bracket.qf.filter(m=>m.winner).length;
+  const sfDone=bracket.sf.filter(m=>m.winner).length;
+  const finalDone=bracket.final[0].winner?1:0;
+  const extrasDone=[extras.champion,extras.goldenBoot,extras.bestPlayer,extras.surpriseTeam,extras.flopTeam].filter(Boolean).length;
+  // Total steps: 12 groups + 16 r32 + 8 r16 + 4 qf + 2 sf + 1 final + 5 extras = 48
+  const total=48;
+  const done=groupsDone+r32Done+r16Done+qfDone+sfDone+finalDone+extrasDone;
+  const pct=Math.round((done/total)*100);
+  const steps=[
+    {label:"Groups",done:groupsDone,total:12},
+    {label:"R32",done:r32Done,total:16},
+    {label:"R16",done:r16Done,total:8},
+    {label:"QF",done:qfDone,total:4},
+    {label:"SF",done:sfDone,total:2},
+    {label:"Final",done:finalDone,total:1},
+    {label:"Extras",done:extrasDone,total:5},
+  ];
+  return(
+    <div style={{background:T.card,border:"1px solid "+T.border,borderRadius:10,padding:"10px 16px",marginBottom:0}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:12,fontWeight:600,color:T.text}}>Prediction Progress</span>
+        <span style={{fontSize:13,fontWeight:800,color:pct===100?T.green:T.gold}}>{pct}%</span>
+      </div>
+      <div style={{height:6,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden",marginBottom:10}}>
+        <div style={{height:"100%",width:pct+"%",background:pct===100?"linear-gradient(90deg,"+T.green+",#22c55e)":"linear-gradient(90deg,"+T.goldBright+","+T.gold+")",borderRadius:3,transition:"width .4s ease"}}/>
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {steps.map(s=>(
+          <div key={s.label} style={{display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontSize:9,color:s.done===s.total?T.green:T.muted,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>{s.label}</span>
+            <span style={{fontSize:9,color:s.done===s.total?T.green:"rgba(255,255,255,0.25)",fontWeight:600}}>{s.done}/{s.total}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SectionHead({label,sub}){
   return(
     <div style={{marginBottom:28}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:sub?6:0}}>
-        <div style={{width:3,height:24,background:`linear-gradient(180deg,${T.goldBright},${T.gold})`,borderRadius:2,flexShrink:0}}/>
-        <h2 style={{margin:0,fontSize:"clamp(18px,2vw,24px)",fontWeight:700,fontFamily:T.ffd,color:T.text,letterSpacing:-.3}}>{label}</h2>
+        <div style={{width:3,height:24,background:"linear-gradient(180deg,"+T.goldBright+","+T.gold+")",borderRadius:2,flexShrink:0}}/>
+        <h2 style={{margin:0,fontSize:"clamp(18px,2vw,24px)",fontWeight:700,fontFamily:T.ffd,color:T.text}}>{label}</h2>
       </div>
       {sub&&<p style={{margin:"0 0 0 15px",fontSize:13,color:T.sub,lineHeight:1.5}}>{sub}</p>}
       <div style={{height:1,background:T.border,marginTop:14}}/>
     </div>
   );
 }
+
 function FormBadge({result}){
   const col=result==="W"?T.green:result==="D"?T.amber:T.red;
-  return <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:6,background:`${col}22`,border:`1px solid ${col}44`,fontSize:11,fontWeight:700,color:col}}>{result}</span>;
+  return <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:6,background:col+"22",border:"1px solid "+col+"44",fontSize:11,fontWeight:700,color:col}}>{result}</span>;
 }
 
-// ─── FORMATION SVG ────────────────────────────────────────────────────────────
+// ─── FORMATION PITCH ─────────────────────────────────────────────────────────
 const FPOS={
   "4-2-3-1":[
     {r:"GK",x:50,y:88},{r:"LB",x:12,y:73},{r:"CB",x:34,y:73},{r:"CB",x:66,y:73},{r:"RB",x:88,y:73},
@@ -591,18 +632,12 @@ const FPOS={
     {r:"LM",x:12,y:54},{r:"CM",x:36,y:54},{r:"CM",x:64,y:54},{r:"RM",x:88,y:54},
     {r:"ST",x:35,y:22},{r:"ST",x:65,y:22},
   ],
-  "4-1-4-1":[
-    {r:"GK",x:50,y:88},{r:"LB",x:12,y:73},{r:"CB",x:34,y:73},{r:"CB",x:66,y:73},{r:"RB",x:88,y:73},
-    {r:"DM",x:50,y:60},
-    {r:"LM",x:12,y:44},{r:"CM",x:34,y:44},{r:"CM",x:66,y:44},{r:"RM",x:88,y:44},
-    {r:"ST",x:50,y:20},
-  ],
 };
 function Pitch({formation,squad}){
   const pos=FPOS[formation]||FPOS["4-3-3"];
   const all=squad?[...squad.gk,...squad.def,...squad.mid,...squad.fwd]:[];
   return(
-    <svg viewBox="0 0 100 110" style={{width:"100%",maxWidth:300,display:"block",borderRadius:8,overflow:"hidden",border:`1px solid ${T.border}`}}>
+    <svg viewBox="0 0 100 110" style={{width:"100%",maxWidth:300,display:"block",borderRadius:8,overflow:"hidden",border:"1px solid "+T.border}}>
       <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#14532d"/><stop offset="100%" stopColor="#166534"/></linearGradient></defs>
       <rect width="100" height="110" fill="url(#pg)"/>
       {[0,1,2,3,4,5].map(i=><rect key={i} x={i*17} width="9" height="110" fill="rgba(0,0,0,0.07)"/>)}
@@ -625,50 +660,29 @@ function Pitch({formation,squad}){
 // ─── BRACKET CARD ─────────────────────────────────────────────────────────────
 function BracketCard({match,onWinner,onTeamChange,isFinal,isR16,slot1Teams,slot2Teams,slot1Label,slot2Label}){
   return(
-    <div style={{
-      background:isFinal?`linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.05))`:T.card,
-      border:`1px solid ${isFinal?T.borderHi:T.border}`,
-      borderRadius:10,overflow:"hidden",minWidth:175,
-      boxShadow:isFinal?"0 0 24px rgba(212,175,55,0.12)":"none",
-    }}>
-      <div style={{padding:"5px 10px",borderBottom:`1px solid ${T.border}`,fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:isFinal?T.gold:T.muted,fontWeight:700}}>{match.label}</div>
+    <div style={{background:isFinal?"linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.05))":T.card,border:"1px solid "+(isFinal?T.borderHi:T.border),borderRadius:10,overflow:"hidden",minWidth:160,boxShadow:isFinal?"0 0 20px rgba(212,175,55,0.1)":"none"}}>
+      <div style={{padding:"5px 10px",borderBottom:"1px solid "+T.border,fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:isFinal?T.gold:T.muted,fontWeight:700}}>{match.label}</div>
       {["team1","team2"].map((slot,i)=>{
-        const team=match[slot],won=match.winner&&match.winner===team;
-        const lost=match.winner&&match.winner!==team&&team;
-        // Which pool of teams is allowed for this slot
-        const allowedTeams = isR16 ? (i===0 ? (slot1Teams||ALL_TEAMS) : (slot2Teams||ALL_TEAMS)) : ALL_TEAMS;
-        const slotHint = isR16 ? (i===0 ? slot1Label : slot2Label) : null;
+        const team=match[slot],won=match.winner&&match.winner===team,lost=match.winner&&match.winner!==team&&team;
+        const allowed=isR16?(i===0?(slot1Teams||ALL_TEAMS):(slot2Teams||ALL_TEAMS)):ALL_TEAMS;
+        const hint=isR16?(i===0?slot1Label:slot2Label):null;
         return(
-          <div key={slot} style={{
-            borderBottom:i===0?`1px solid ${T.border}`:"none",
-            background:won?`linear-gradient(90deg,rgba(212,175,55,0.15),transparent)`:"transparent",
-            transition:"background .15s",
-          }}>
+          <div key={slot} style={{borderBottom:i===0?"1px solid "+T.border:"none",background:won?"linear-gradient(90deg,rgba(212,175,55,0.15),transparent)":"transparent",transition:"background .15s"}}>
             {isR16&&!team?(
               <div>
-                {slotHint&&(
-                  <div style={{padding:"4px 10px 0",fontSize:9,color:T.muted,letterSpacing:.5,fontStyle:"italic"}}>
-                    {slotHint}
-                  </div>
-                )}
-                <select
-                  onChange={e=>e.target.value&&onTeamChange&&onTeamChange(slot,e.target.value)}
-                  defaultValue=""
-                  style={{width:"100%",padding:"6px 10px 8px",background:"rgba(255,255,255,0.03)",border:"none",color:T.sub,fontFamily:"inherit",fontSize:12,cursor:"pointer",outline:"none"}}
-                >
-                  <option value="">— Pick team —</option>
-                  {allowedTeams.map(t=><option key={t} value={t}>{teamName(t)}</option>)}
+                {hint&&<div style={{padding:"4px 10px 0",fontSize:9,color:T.muted,letterSpacing:.5,fontStyle:"italic"}}>{hint}</div>}
+                <select onChange={e=>e.target.value&&onTeamChange&&onTeamChange(slot,e.target.value)} defaultValue=""
+                  style={{width:"100%",padding:"7px 10px",background:"transparent",border:"none",color:T.sub,fontFamily:"inherit",fontSize:12,cursor:"pointer",outline:"none"}}>
+                  <option value="">— Pick —</option>
+                  {allowed.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             ):(
-              <div
-                onClick={()=>team&&onWinner(team)}
-                style={{display:"flex",alignItems:"center",gap:8,padding:"9px 10px",cursor:team?"pointer":"default",opacity:lost?0.4:1,transition:"opacity .15s"}}
-              >
+              <div onClick={()=>team&&onWinner(team)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:team?"pointer":"default",opacity:lost?0.35:1,transition:"opacity .15s"}}>
                 {team&&<Flag team={team} size={20} radius={3}/>}
-                <span style={{fontSize:13,fontWeight:won?700:500,color:won?T.goldBright:team?T.text:T.muted,flex:1,fontFamily:"inherit",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team?teamName(team):"TBD"}</span>
-                {won&&<span style={{fontSize:9,color:T.gold,letterSpacing:1,fontWeight:700,background:T.goldSoft,padding:"2px 5px",borderRadius:3}}>✓</span>}
-                {team&&!match.winner&&<span style={{fontSize:9,color:T.muted,flexShrink:0}}>tap</span>}
+                <span style={{fontSize:13,fontWeight:won?700:500,color:won?T.goldBright:team?T.text:T.muted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team||"TBD"}</span>
+                {won&&<span style={{fontSize:9,color:T.gold,fontWeight:700,background:T.goldSoft,padding:"2px 5px",borderRadius:3}}>✓</span>}
+                {team&&!match.winner&&<span style={{fontSize:9,color:T.muted}}>tap</span>}
               </div>
             )}
           </div>
@@ -678,7 +692,7 @@ function BracketCard({match,onWinner,onTeamChange,isFinal,isR16,slot1Teams,slot2
   );
 }
 
-// ─── PLAYERS ─────────────────────────────────────────────────────────────────
+// ─── PLAYERS LIST ─────────────────────────────────────────────────────────────
 const PLAYERS_LIST=[
   "Kylian Mbappe (FRA)","Erling Haaland (NOR)","Vinicius Jr (BRA)","Harry Kane (ENG)",
   "Lionel Messi? (ARG)","Cristiano Ronaldo (POR)","Jude Bellingham (ENG)","Lamine Yamal (ESP)",
@@ -688,510 +702,316 @@ const PLAYERS_LIST=[
   "Son Heung-min (KOR)","Darwin Nunez (URU)","Luis Diaz (COL)","Takefusa Kubo (JPN)",
 ];
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function App(){
-  const [tab,setTab]=useState("groups");
-  const [userName,setUserName]=useState("");
-  const [confetti,setConfetti]=useState(false);
-  const [groupMatches,setGroupMatches]=useState(()=>{
-    const m={};Object.keys(WC_GROUPS).forEach(g=>{m[g]=getGroupMatches(g);});return m;
-  });
-  const [bracket,setBracket]=useState(emptyBracket);
-  const [extras,setExtras]=useState({champion:"",goldenBoot:"",bestPlayer:"",surpriseTeam:"",flopTeam:"",notes:"",championConf:70,goldenBootConf:65});
 
-  const updateMatch=(g,idx,field,val)=>setGroupMatches(prev=>{const arr=[...prev[g]];arr[idx]={...arr[idx],[field]:val};return{...prev,[g]:arr};});
+function defaultRankings(){
+  const r={};
+  Object.keys(WC_GROUPS).forEach(g=>{r[g]=[...WC_GROUPS[g].teams];});
+  return r;
+}
 
-  const setWinner=(round,idx,winner)=>{
-    setBracket(prev=>{
-      const nxt={...prev};const arr=[...nxt[round]];arr[idx]={...arr[idx],winner};nxt[round]=arr;
-      const NR={r16:"qf",qf:"sf",sf:"final"};const nr=NR[round];
-      if(nr){
-        const na=[...nxt[nr]];const ni=Math.floor(idx/2);const slot=idx%2===0?"team1":"team2";
-        na[ni]={...na[ni],[slot]:winner,winner:""};nxt[nr]=na;
-        if(nr==="qf"){const sa=[...nxt.sf];const si=Math.floor(ni/2);sa[si]={...sa[si],winner:"",[ni%2===0?"team1":"team2"]:""};nxt.sf=sa;nxt.final=[{...nxt.final[0],winner:"",team1:"",team2:""}];}
-        if(nr==="sf")nxt.final=[{...nxt.final[0],winner:""}];
-      }
-      if(round==="sf"){const ta=[...nxt.third];const m=arr[idx];const loser=m.team1===winner?m.team2:m.team1;ta[0]={...ta[0],[idx===0?"team1":"team2"]:loser,winner:""};nxt.third=ta;}
-      return nxt;
-    });
+// ─── BRACKET ─────────────────────────────────────────────────────────────────
+const R32_SLOTS=[
+  {id:"r32_0",label:"1A vs 2B"},{id:"r32_1",label:"1C vs 2D"},
+  {id:"r32_2",label:"1E vs 2F"},{id:"r32_3",label:"1G vs 2H"},
+  {id:"r32_4",label:"1I vs 2J"},{id:"r32_5",label:"1K vs 2L"},
+  {id:"r32_6",label:"1B vs 2A"},{id:"r32_7",label:"1D vs 2C"},
+  {id:"r32_8",label:"1F vs 2E"},{id:"r32_9",label:"1H vs 2G"},
+  {id:"r32_10",label:"1J vs 2I"},{id:"r32_11",label:"1L vs 2K"},
+  {id:"r32_12",label:"Best 3rd #1"},{id:"r32_13",label:"Best 3rd #2"},
+  {id:"r32_14",label:"Best 3rd #3"},{id:"r32_15",label:"Best 3rd #4"},
+];
+const R32_MATCHUPS=[
+  [["A",0],["B",1]],[["C",0],["D",1]],[["E",0],["F",1]],[["G",0],["H",1]],
+  [["I",0],["J",1]],[["K",0],["L",1]],[["B",0],["A",1]],[["D",0],["C",1]],
+  [["F",0],["E",1]],[["H",0],["G",1]],[["J",0],["I",1]],[["L",0],["K",1]],
+  null,null,null,null,
+];
+function emptyBracket(){
+  return{
+    r32:R32_SLOTS.map(s=>({...s,team1:"",team2:"",winner:""})),
+    r16:Array.from({length:8},(_,i)=>({id:"r16_"+i,label:"R16 Match "+(i+1),team1:"",team2:"",winner:""})),
+    qf:Array.from({length:4},(_,i)=>({id:"qf_"+i,label:"QF "+(i+1),team1:"",team2:"",winner:""})),
+    sf:Array.from({length:2},(_,i)=>({id:"sf_"+i,label:"SF "+(i+1),team1:"",team2:"",winner:""})),
+    final:[{id:"final",label:"The Final",team1:"",team2:"",winner:""}],
+    third:[{id:"third",label:"3rd Place",team1:"",team2:"",winner:""}],
   };
-
-  const chaosMode=()=>{
-    const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
-    const nm={};Object.keys(WC_GROUPS).forEach(g=>{nm[g]=getGroupMatches(g).map(m=>({...m,homeGoals:String(Math.floor(Math.random()*5)),awayGoals:String(Math.floor(Math.random()*5))}));});
-    setGroupMatches(nm);
-    const nb=emptyBracket();const sh=[...ALL_TEAMS].sort(()=>Math.random()-.5);
-    nb.r16=nb.r16.map((m,i)=>({...m,team1:sh[i*2%sh.length]||"TBD",team2:sh[(i*2+1)%sh.length]||"TBD"}));
-    ["r16","qf","sf","final"].forEach(rd=>{
-      nb[rd]=nb[rd].map((m,i)=>{const w=Math.random()>.5?m.team1:m.team2;const NR={r16:"qf",qf:"sf",sf:"final"};if(NR[rd]&&nb[NR[rd]][Math.floor(i/2)])nb[NR[rd]][Math.floor(i/2)][i%2===0?"team1":"team2"]=w;return{...m,winner:w};});
-    });
-    nb.third[0]={...nb.third[0],team1:pick(ALL_TEAMS),team2:pick(ALL_TEAMS),winner:pick(ALL_TEAMS)};
-    setExtras({champion:pick(ALL_TEAMS),goldenBoot:pick(PLAYERS_LIST),bestPlayer:pick(PLAYERS_LIST),surpriseTeam:pick(ALL_TEAMS),flopTeam:pick(ALL_TEAMS),notes:"Chaos Mode — all bets are off.",championConf:Math.floor(Math.random()*55)+20,goldenBootConf:Math.floor(Math.random()*55)+20});
-    setBracket(nb);setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");
-  };
-
-  const TABS=[{id:"groups",label:"Group Stage"},{id:"knockout",label:"Knockout"},{id:"extras",label:"Extras"},{id:"teams",label:"Teams"},{id:"summary",label:"Summary"}];
-
-  const TAB_ICONS={groups:"⚽",knockout:"🏆",extras:"⭐",teams:"🌍",summary:"📋"};
-
-  return(
-    <div style={{width:"100vw",minHeight:"100vh",background:T.bg,color:T.text,fontFamily:T.ff,display:"flex",flexDirection:"column",overflowX:"hidden"}}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@600;700;900&display=swap" rel="stylesheet"/>
-      <style>{`
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html,body,#root{width:100%;min-height:100vh;overflow-x:hidden;background:#080a0f;}
-        ::-webkit-scrollbar{width:6px;height:6px;}
-        ::-webkit-scrollbar-track{background:transparent;}
-        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px;}
-        ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2);}
-        input[type=number]::-webkit-inner-spin-button,
-        input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
-        input[type=number]{-moz-appearance:textfield;}
-        select option{background:#0f1117;color:#eef0f4;}
-        select{-webkit-appearance:none;appearance:none;}
-        button{-webkit-tap-highlight-color:transparent;}
-        @media(max-width:640px){
-          .desktop-only{display:none!important;}
-          .mobile-nav{display:flex!important;}
-          .desktop-nav{display:none!important;}
-          .main-pad{padding:16px 12px 90px!important;}
-          .group-grid{grid-template-columns:1fr!important;}
-          .team-grid{grid-template-columns:repeat(3,1fr)!important;}
-          .extras-grid{grid-template-columns:1fr!important;}
-          .summary-grid{grid-template-columns:repeat(2,1fr)!important;}
-          .bracket-hint{display:block!important;}
-        }
-        @media(min-width:641px){
-          .mobile-nav{display:none!important;}
-          .mobile-only{display:none!important;}
-        }
-      `}</style>
-      <Confetti active={confetti}/>
-
-      {/* ── DESKTOP TOP BAR ── */}
-      <header className="desktop-nav" style={{flexShrink:0,background:T.surface,borderBottom:`1px solid ${T.border}`,position:"sticky",top:0,zIndex:200}}>
-        <div style={{padding:"0 24px",display:"flex",alignItems:"center",gap:0,height:54}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginRight:28,flexShrink:0}}>
-            <span style={{fontSize:20,lineHeight:1}}>🏆</span>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:T.text,lineHeight:1.1,fontFamily:T.ffd}}>WC 2026</div>
-              <div style={{fontSize:9,color:T.sub,letterSpacing:1.5,textTransform:"uppercase"}}>Predictor</div>
-            </div>
-          </div>
-          <nav style={{display:"flex",gap:0,flex:1,overflowX:"auto",height:"100%"}}>
-            {TABS.map(t=>(
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{
-                height:"100%",padding:"0 16px",border:"none",
-                borderBottom:`3px solid ${tab===t.id?T.gold:"transparent"}`,
-                borderTop:"3px solid transparent",
-                background:"transparent",color:tab===t.id?T.gold:T.sub,
-                fontFamily:T.ff,fontSize:13,fontWeight:tab===t.id?600:400,
-                cursor:"pointer",transition:"color .15s",whiteSpace:"nowrap",
-                display:"flex",alignItems:"center",gap:6,
-              }}>
-                <span style={{fontSize:14}}>{TAB_ICONS[t.id]}</span>
-                <span>{t.label}</span>
-              </button>
-            ))}
-          </nav>
-          <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:12,flexShrink:0}}>
-            <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name"
-              style={{padding:"7px 12px",background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontFamily:T.ff,fontSize:12,width:120,outline:"none"}}/>
-            <button onClick={chaosMode} style={{padding:"7px 12px",border:`1px solid ${T.border}`,borderRadius:7,background:"transparent",color:T.sub,fontFamily:T.ff,fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>💀 Chaos</button>
-            <button onClick={()=>{setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");}} style={{padding:"7px 14px",border:"none",borderRadius:7,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Done ✓</button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── MOBILE TOP BAR ── */}
-      <header className="mobile-nav" style={{flexShrink:0,background:T.surface,borderBottom:`1px solid ${T.border}`,position:"sticky",top:0,zIndex:200,padding:"10px 14px",alignItems:"center",justifyContent:"space-between",gap:8}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:20}}>🏆</span>
-          <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:T.ffd}}>WC 2026</div>
-        </div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name"
-            style={{padding:"6px 10px",background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontFamily:T.ff,fontSize:12,width:100,outline:"none"}}/>
-          <button onClick={()=>{setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");}} style={{padding:"6px 12px",border:"none",borderRadius:7,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:12,fontWeight:700,cursor:"pointer"}}>Done ✓</button>
-        </div>
-      </header>
-
-      {/* ── CONTENT ── */}
-      <main className="main-pad" style={{flex:1,padding:"24px 24px 80px",maxWidth:"100%",boxSizing:"border-box"}}>
-        {tab==="groups"   && <GroupStage groupMatches={groupMatches} updateMatch={updateMatch}/>}
-        {tab==="knockout" && <KnockoutStage bracket={bracket} setWinner={setWinner} setBracket={setBracket} groupMatches={groupMatches}/>}
-        {tab==="extras"   && <ExtrasSection extras={extras} setExtras={setExtras}/>}
-        {tab==="teams"    && <TeamsSection/>}
-        {tab==="summary"  && <SummaryPage groupMatches={groupMatches} bracket={bracket} extras={extras} userName={userName}/>}
-      </main>
-
-      {/* ── MOBILE BOTTOM TAB BAR ── */}
-      <nav className="mobile-nav" style={{
-        position:"fixed",bottom:0,left:0,right:0,zIndex:300,
-        background:T.surface,borderTop:`1px solid ${T.border}`,
-        display:"flex",alignItems:"stretch",
-        paddingBottom:"env(safe-area-inset-bottom)",
-      }}>
-        {TABS.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{
-            flex:1,border:"none",background:"transparent",
-            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-            gap:3,padding:"8px 2px 6px",cursor:"pointer",
-            borderTop:`2px solid ${tab===t.id?T.gold:"transparent"}`,
-            transition:"all .15s",
-          }}>
-            <span style={{fontSize:18,lineHeight:1}}>{TAB_ICONS[t.id]}</span>
-            <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?T.gold:T.sub,letterSpacing:.3,fontFamily:T.ff,textTransform:"uppercase"}}>{t.label.split(" ")[0]}</span>
-          </button>
-        ))}
-        <button onClick={chaosMode} style={{
-          flex:1,border:"none",background:"transparent",
-          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-          gap:3,padding:"8px 2px 6px",cursor:"pointer",
-          borderTop:"2px solid transparent",
-        }}>
-          <span style={{fontSize:18,lineHeight:1}}>💀</span>
-          <span style={{fontSize:9,fontWeight:400,color:T.sub,letterSpacing:.3,fontFamily:T.ff,textTransform:"uppercase"}}>Chaos</span>
-        </button>
-      </nav>
-    </div>
-  );
 }
 
 // ─── GROUP STAGE ─────────────────────────────────────────────────────────────
-function GroupStage({groupMatches,updateMatch}){
+function GroupStage({groupRankings,moveTeam}){
   return(
     <div>
-      <SectionHead label="Group Stage" sub="All 12 official groups — FIFA World Cup 2026. Enter your predicted scorelines and standings update live."/>
-      <div className="group-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:18}}>
-        {Object.keys(WC_GROUPS).map(g=><GroupCard key={g} group={g} matches={groupMatches[g]} onUpdate={(i,f,v)=>updateMatch(g,i,f,v)}/>)}
-      </div>
-    </div>
-  );
-}
-function ScoreInput({value,onChange}){
-  return(
-    <input
-      type="number" min="0" max="20"
-      value={value}
-      onChange={onChange}
-      style={{
-        width:42,height:42,textAlign:"center",
-        background:value!==""?"rgba(212,175,55,0.12)":"rgba(255,255,255,0.05)",
-        border:`1.5px solid ${value!==""?"rgba(212,175,55,0.5)":"rgba(255,255,255,0.1)"}`,
-        borderRadius:8,
-        color:value!==""?T.goldBright:T.sub,
-        fontSize:18,fontWeight:800,fontFamily:"inherit",
-        outline:"none",
-        transition:"all .15s",
-        boxSizing:"border-box",
-      }}
-    />
-  );
-}
-
-function MatchRow({m,i,onUpdate}){
-  const hg=parseInt(m.homeGoals),ag=parseInt(m.awayGoals);
-  const played=!isNaN(hg)&&!isNaN(ag);
-  const homeWin=played&&hg>ag,awayWin=played&&ag>hg,draw=played&&hg===ag;
-  return(
-    <div style={{
-      display:"flex",alignItems:"center",gap:0,
-      padding:"10px 10px",
-      background:T.raised,
-      borderRadius:10,
-      marginBottom:6,
-      border:`1px solid ${T.border}`,
-      position:"relative",
-      overflow:"hidden",
-    }}>
-      {/* Home team */}
-      <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-        <Flag team={m.home} size={22} radius={3}/>
-        <span style={{
-          fontSize:13,fontWeight:homeWin?700:500,
-          color:homeWin?T.text:played?T.sub:T.text,
-          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
-        }}>{teamName(m.home)}</span>
-      </div>
-
-      {/* Score box */}
-      <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0,padding:"0 10px"}}>
-        <ScoreInput value={m.homeGoals} onChange={e=>onUpdate(i,"homeGoals",e.target.value)}/>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,width:18}}>
-          <span style={{fontSize:9,color:T.muted,fontWeight:600,letterSpacing:.5}}>VS</span>
-          {played&&<span style={{fontSize:8,color:draw?T.amber:T.muted}}>{draw?"D":""}</span>}
-        </div>
-        <ScoreInput value={m.awayGoals} onChange={e=>onUpdate(i,"awayGoals",e.target.value)}/>
-      </div>
-
-      {/* Away team */}
-      <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0,justifyContent:"flex-end"}}>
-        <span style={{
-          fontSize:13,fontWeight:awayWin?700:500,
-          color:awayWin?T.text:played?T.sub:T.text,
-          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"right",
-        }}>{teamName(m.away)}</span>
-        <Flag team={m.away} size={22} radius={3}/>
-      </div>
-
-      {/* Winner glow strip */}
-      {played&&!draw&&(
-        <div style={{
-          position:"absolute",bottom:0,left:homeWin?"0":"auto",right:awayWin?"0":"auto",
-          width:"30%",height:2,
-          background:`linear-gradient(${homeWin?"90deg":"270deg"},${T.green},transparent)`,
-        }}/>
-      )}
-    </div>
-  );
-}
-
-function GroupCard({group,matches,onUpdate}){
-  const teams=WC_GROUPS[group].teams,standings=computeStandings(teams,matches);
-  const filledCount=matches.filter(m=>m.homeGoals!==""&&m.awayGoals!=="").length;
-  return(
-    <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:14,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-      {/* Header */}
-      <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",background:T.card}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:32,height:32,borderRadius:8,background:`linear-gradient(135deg,${T.gold}22,${T.gold}11)`,border:`1px solid ${T.borderHi}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <span style={{fontSize:13,fontWeight:900,color:T.gold,fontFamily:T.ffd}}>{group}</span>
-          </div>
-          <div>
-            <div style={{fontSize:11,fontWeight:700,letterSpacing:1.5,color:T.gold,textTransform:"uppercase"}}>Group {group}</div>
-            <div style={{fontSize:10,color:T.sub,marginTop:1}}>{filledCount}/{matches.length} matches predicted</div>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:4}}>
-          {teams.map(t=><Flag key={t} team={t} size={18} radius={3}/>)}
-        </div>
-      </div>
-
-      {/* Matches */}
-      <div style={{padding:"12px 14px"}}>
-        {matches.map((m,i)=><MatchRow key={i} m={m} i={i} onUpdate={onUpdate}/>)}
-      </div>
-
-      {/* Standings */}
-      <div style={{borderTop:`1px solid ${T.border}`,background:T.card}}>
-        <div style={{padding:"6px 14px 3px",display:"flex",gap:0,fontSize:9,color:T.muted,letterSpacing:.8,textTransform:"uppercase",fontWeight:600}}>
-          <span style={{flex:1}}>Team</span>
-          <span style={{width:18,textAlign:"center"}}>W</span>
-          <span style={{width:18,textAlign:"center"}}>D</span>
-          <span style={{width:18,textAlign:"center"}}>L</span>
-          <span style={{width:22,textAlign:"center"}}>GD</span>
-          <span style={{width:26,textAlign:"right"}}>Pts</span>
-          <span style={{width:14}}/>
-        </div>
-        {standings.map((t,i)=>{
-          const qualified=i<2,third=i===2;
-          return(
-            <div key={t.name} style={{
-              display:"flex",alignItems:"center",gap:0,
-              padding:"7px 16px",
-              borderTop:`1px solid ${T.border}`,
-              background:qualified?"rgba(52,211,153,0.04)":"transparent",
-              transition:"background .15s",
-            }}>
-              <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-                <span style={{
-                  width:20,height:20,borderRadius:5,flexShrink:0,
-                  background:qualified?T.greenBg:third?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.04)",
-                  color:qualified?T.green:third?T.blue:T.muted,
-                  fontSize:10,fontWeight:700,
-                  display:"inline-flex",alignItems:"center",justifyContent:"center",
-                }}>{i+1}</span>
-                <Flag team={t.name} size={18} radius={3}/>
-                <span style={{fontSize:12,fontWeight:qualified?600:400,color:qualified?T.text:T.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{teamName(t.name)}</span>
-              </div>
-              <span style={{width:18,textAlign:"center",fontSize:11,color:T.muted}}>{t.w}</span>
-              <span style={{width:18,textAlign:"center",fontSize:11,color:T.muted}}>{t.d}</span>
-              <span style={{width:18,textAlign:"center",fontSize:11,color:T.muted}}>{t.l}</span>
-              <span style={{width:22,textAlign:"center",fontSize:11,color:t.gd>0?T.green:t.gd<0?T.red:T.muted,fontWeight:t.gd!==0?600:400}}>{t.gd>0?"+"+t.gd:t.gd}</span>
-              <span style={{width:26,textAlign:"right",fontSize:12,fontWeight:700,color:qualified?T.text:T.sub}}>{t.pts}</span>
-              <span style={{width:16,textAlign:"right"}}>
-                {qualified?<span style={{fontSize:8,color:T.green,fontWeight:700,background:T.greenBg,padding:"1px 4px",borderRadius:3}}>Q</span>
-                :third?<span style={{fontSize:8,color:T.blue,fontWeight:700,background:"rgba(96,165,250,0.1)",padding:"1px 4px",borderRadius:3}}>3</span>
-                :<span style={{fontSize:8,color:T.muted}}>—</span>}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── KNOCKOUT ─────────────────────────────────────────────────────────────────
-// Real WC2026 R16 matchup mapping: slot index -> [group1winner, group2winner]
-// Format: [groupLetter, position] where position 0=1st, 1=2nd
-const R16_MATCHUPS = [
-  [["A",0],["B",1]], // 1A vs 2B
-  [["C",0],["D",1]], // 1C vs 2D
-  [["E",0],["F",1]], // 1E vs 2F
-  [["G",0],["H",1]], // 1G vs 2H
-  [["I",0],["J",1]], // 1I vs 2J
-  [["K",0],["L",1]], // 1K vs 2L
-  [["B",0],["A",1]], // 1B vs 2A
-  [["D",0],["C",1]], // 1D vs 2C
-  [["F",0],["E",1]], // 1F vs 2E
-  [["H",0],["G",1]], // 1H vs 2G
-  [["J",0],["I",1]], // 1J vs 2I
-  [["L",0],["K",1]], // 1L vs 2K
-  // last 4 are best 3rd place teams — left as manual
-  null, null, null, null,
-];
-
-function KnockoutStage({bracket,setWinner,setBracket,groupMatches}){
-
-  // Derive group standings from current match results
-  const getQualified = () => {
-    const q = {};
-    Object.keys(WC_GROUPS).forEach(g => {
-      const st = computeStandings(WC_GROUPS[g].teams, groupMatches[g]);
-      q[g] = st; // full sorted standings array
-    });
-    return q;
-  };
-
-  // Auto-fill R16 from group stage results
-  const autoFillR16 = () => {
-    const q = getQualified();
-    setBracket(prev => {
-      const nb = {...prev};
-      const newR16 = prev.r16.map((m, i) => {
-        const mu = R16_MATCHUPS[i];
-        if (!mu) return m; // best 3rd place slots — leave manual
-        const [[g1, p1], [g2, p2]] = mu;
-        const t1 = q[g1]?.[p1]?.name || "";
-        const t2 = q[g2]?.[p2]?.name || "";
-        return {...m, team1: t1, team2: t2, winner: ""};
-      });
-      nb.r16 = newR16;
-      // Clear downstream rounds
-      nb.qf = prev.qf.map(m=>({...m,team1:"",team2:"",winner:""}));
-      nb.sf = prev.sf.map(m=>({...m,team1:"",team2:"",winner:""}));
-      nb.final = [{...prev.final[0],team1:"",team2:"",winner:""}];
-      nb.third = [{...prev.third[0],team1:"",team2:"",winner:""}];
-      return nb;
-    });
-  };
-
-  // Manually update a single R16 team slot
-  const setR16Team = (matchIdx, slot, team) => {
-    setBracket(prev => {
-      const nb = {...prev};
-      const newR16 = [...nb.r16];
-      newR16[matchIdx] = {...newR16[matchIdx], [slot]: team, winner: ""};
-      nb.r16 = newR16;
-      return nb;
-    });
-  };
-
-  const allGroupsDone = Object.keys(WC_GROUPS).every(g =>
-    groupMatches[g].every(m => m.homeGoals !== "" && m.awayGoals !== "")
-  );
-  const someGroupsDone = Object.keys(WC_GROUPS).some(g =>
-    groupMatches[g].some(m => m.homeGoals !== "" && m.awayGoals !== "")
-  );
-
-  return(
-    <div>
-      <SectionHead label="Knockout Stage"/>
-
-      {/* Auto-fill banner */}
-      <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap",marginBottom:28,marginTop:-14,padding:"16px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:12}}>
-        <div style={{fontSize:28,flexShrink:0}}>{allGroupsDone?"✅":someGroupsDone?"⏳":"💡"}</div>
-        <div style={{flex:1,minWidth:180}}>
-          <div style={{fontSize:14,fontWeight:600,color:T.text,marginBottom:3}}>
-            {allGroupsDone?"Groups complete — ready to auto-fill":someGroupsDone?"Groups partially filled":"Start by predicting Group Stage scores"}
-          </div>
-          <div style={{fontSize:12,color:T.sub}}>
-            {allGroupsDone?"Click to populate all R32 slots from your group predictions.":someGroupsDone?"Partial auto-fill available — empty slots will remain for manual pick.":"Or skip ahead and pick teams manually using the dropdowns in each slot below."}
-          </div>
-        </div>
-        <button
-          onClick={autoFillR16}
-          style={{padding:"10px 20px",border:"none",borderRadius:8,background:`linear-gradient(135deg,${T.goldBright},${T.gold})`,color:"#000",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}
-        >
-          Auto-Fill from Groups →
-        </button>
-      </div>
-
-      {/* Mobile hint */}
-      <div className="bracket-hint" style={{display:"none",marginBottom:16,padding:"10px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,color:T.sub}}>
-        📱 Scroll right to see the full bracket, or use the round buttons below to jump to each stage.
-      </div>
-
-      {/* Mobile round jump buttons */}
-      <div className="mobile-only" style={{display:"flex",gap:6,marginBottom:16,overflowX:"auto",paddingBottom:4}}>
-        {[["r32","R32"],["qf","QF"],["sf","SF"],["f","Final"]].map(([id,lbl])=>(
-          <a key={id} href={`#bracket-${id}`} style={{padding:"6px 14px",border:`1px solid ${T.border}`,borderRadius:20,background:T.card,color:T.sub,fontSize:11,fontWeight:600,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
-            {lbl}
-          </a>
+      <SectionHead label="Group Stage" sub="Drag teams up/down — or use the arrows — to set your predicted finishing order. Top 2 from each group qualify automatically."/>
+      <div className="group-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+        {Object.keys(WC_GROUPS).map(g=>(
+          <GroupRankCard key={g} group={g} ranking={groupRankings[g]||WC_GROUPS[g].teams} moveTeam={moveTeam}/>
         ))}
       </div>
+    </div>
+  );
+}
 
-      <div style={{overflowX:"auto",paddingBottom:12,WebkitOverflowScrolling:"touch"}}>
-        <div style={{display:"flex",gap:14,alignItems:"flex-start",minWidth:900,padding:"4px 0"}}>
-          <div style={{flex:2.2}} id="bracket-r32">
-            <RoundLabel>Round of 32</RoundLabel>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {bracket.r16.map((m,i)=>{
-                // Build the allowed team list for each slot based on R16_MATCHUPS
-                const mu = R16_MATCHUPS[i];
-                let slot1Teams = ALL_TEAMS; // best-3rd slots: any team
-                let slot2Teams = ALL_TEAMS;
-                let slot1Label = "team1";
-                let slot2Label = "team2";
-                if(mu){
-                  const [[g1,p1],[g2,p2]] = mu;
-                  slot1Teams = WC_GROUPS[g1].teams;
-                  slot2Teams = WC_GROUPS[g2].teams;
-                  slot1Label = `${p1===0?"1st":"2nd"} in Group ${g1}`;
-                  slot2Label = `${p2===0?"1st":"2nd"} in Group ${g2}`;
-                }
+function GroupRankCard({group,ranking,moveTeam}){
+  const [dragging,setDragging]=React.useState(null);
+  const [dragOver,setDragOver]=React.useState(null);
+  const onDragStart=i=>setDragging(i);
+  const onDragEnter=i=>setDragOver(i);
+  const onDragEnd=()=>{
+    if(dragging!==null&&dragOver!==null&&dragging!==dragOver)moveTeam(group,dragging,dragOver);
+    setDragging(null);setDragOver(null);
+  };
+  const POS_BG=["rgba(52,211,153,0.15)","rgba(52,211,153,0.08)","rgba(96,165,250,0.08)","rgba(255,255,255,0.03)"];
+  const POS_COL=[T.green,T.green,T.blue,T.muted];
+  const POS_LABEL=["1st","2nd","3rd","4th"];
+  const STATUS_LABEL=["Qualifies","Qualifies","Best 3rd?","Eliminated"];
+  return(
+    <div style={{background:T.surface,border:"1px solid "+T.border,borderRadius:14,overflow:"hidden"}}>
+      <div style={{padding:"12px 16px",background:T.card,borderBottom:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:30,height:30,borderRadius:8,background:"rgba(212,175,55,0.12)",border:"1px solid rgba(212,175,55,0.3)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontSize:14,fontWeight:900,color:T.gold,fontFamily:T.ffd}}>{group}</span>
+          </div>
+          <span style={{fontSize:12,fontWeight:600,color:T.text}}>Group {group}</span>
+        </div>
+        <div style={{display:"flex",gap:4}}>{ranking.map(t=><Flag key={t} team={t} size={18} radius={2}/>)}</div>
+      </div>
+      <div style={{padding:"6px 12px",fontSize:10,color:T.muted,background:"rgba(255,255,255,0.02)",borderBottom:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <span>↕ Drag or use arrows to reorder</span>
+        <button onClick={()=>{WC_GROUPS[group].teams.forEach((_,i)=>moveTeam(group,ranking.indexOf(WC_GROUPS[group].teams[i]),i));}}
+          style={{fontSize:9,color:T.muted,background:"none",border:"none",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",padding:0}}>Reset ↺</button>
+      </div>
+      <div style={{padding:"8px"}}>
+        {ranking.map((team,i)=>(
+          <div key={team} draggable
+            onDragStart={()=>onDragStart(i)}
+            onDragEnter={()=>onDragEnter(i)}
+            onDragOver={e=>e.preventDefault()}
+            onDragEnd={onDragEnd}
+            style={{
+              display:"flex",alignItems:"center",gap:8,padding:"9px 10px",marginBottom:i<3?5:0,
+              borderRadius:9,background:dragging===i?"rgba(212,175,55,0.1)":dragOver===i?"rgba(255,255,255,0.07)":POS_BG[i],
+              border:"1px solid "+(dragging===i?"rgba(212,175,55,0.4)":"rgba(255,255,255,0.06)"),
+              cursor:"grab",transition:"all .1s",userSelect:"none",
+            }}>
+            <div style={{width:22,height:22,borderRadius:6,flexShrink:0,background:POS_BG[i],color:POS_COL[i],fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid "+POS_COL[i]+"30"}}>{i+1}</div>
+            <Flag team={team} size={22} radius={3}/>
+            <span style={{flex:1,fontSize:13,fontWeight:i<2?600:400,color:i<2?T.text:T.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</span>
+            <span style={{fontSize:9,fontWeight:700,color:POS_COL[i],background:POS_BG[i],padding:"2px 6px",borderRadius:10,letterSpacing:.3,flexShrink:0}}>{STATUS_LABEL[i]}</span>
+            <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+              <button onClick={()=>moveTeam(group,i,i-1)} disabled={i===0}
+                style={{width:18,height:15,border:"none",borderRadius:3,background:"rgba(255,255,255,0.07)",color:i===0?T.muted:T.sub,fontSize:9,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▲</button>
+              <button onClick={()=>moveTeam(group,i,i+1)} disabled={i===3}
+                style={{width:18,height:15,border:"none",borderRadius:3,background:"rgba(255,255,255,0.07)",color:i===3?T.muted:T.sub,fontSize:9,cursor:i===3?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▼</button>
+            </div>
+            <span style={{fontSize:13,color:T.muted,flexShrink:0}}>⠿</span>
+          </div>
+        ))}
+      </div>
+      <div style={{padding:"4px 12px 8px",fontSize:10,color:T.muted}}>* Best 8 third-place teams across all groups also advance</div>
+    </div>
+  );
+}
+
+
+function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomised}){
+
+  // Auto-fill R32 from group rankings
+  const autoFill=()=>{
+    setBracket(prev=>{
+      const nb={...prev};
+      // Fill group-based slots
+      const newR32=nb.r32.map((m,i)=>{
+        const mu=R32_MATCHUPS[i];
+        if(!mu)return m;
+        const [[g1,p1],[g2,p2]]=mu;
+        return{...m,team1:groupRankings[g1]?.[p1]||"",team2:groupRankings[g2]?.[p2]||"",winner:""};
+      });
+      nb.r32=newR32;
+      nb.r16=nb.r16.map(m=>({...m,team1:"",team2:"",winner:""}));
+      nb.qf=nb.qf.map(m=>({...m,team1:"",team2:"",winner:""}));
+      nb.sf=nb.sf.map(m=>({...m,team1:"",team2:"",winner:""}));
+      nb.final=[{...nb.final[0],team1:"",team2:"",winner:""}];
+      nb.third=[{...nb.third[0],team1:"",team2:"",winner:""}];
+      return nb;
+    });
+  };
+
+  // Set a team in a R32 slot manually
+  const setR32Team=(idx,slot,team)=>{
+    setBracket(prev=>{
+      const nb={...prev};const arr=[...nb.r32];
+      arr[idx]={...arr[idx],[slot]:team,winner:""};nb.r32=arr;return nb;
+    });
+  };
+
+  // Set best-3rd teams (slots 12-15)
+  const setThirdTeam=(slotIdx,team)=>setR32Team(slotIdx+12,"team1",team);
+
+  // All 3rd place teams from rankings
+  const thirdPlaceTeams=Object.keys(WC_GROUPS).map(g=>groupRankings[g]?.[2]).filter(Boolean);
+
+  return(
+    <div>
+      <SectionHead label="Knockout Stage" sub="Click any team to advance them. Winners auto-progress through the bracket."/>
+
+      {/* Auto-fill banner */}
+      <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",marginBottom:20,padding:"14px 18px",background:T.card,border:`1px solid ${T.border}`,borderRadius:12}}>
+        <div style={{flex:1,minWidth:160}}>
+          <div style={{fontSize:14,fontWeight:600,color:T.text,marginBottom:2}}>
+            {groupsCustomised?"✅ Group rankings set":"💡 Set group rankings first"}
+          </div>
+          <div style={{fontSize:12,color:T.sub}}>
+            {groupsCustomised?"Auto-fill populates all 24 group-qualified spots.":"Go to Group Stage tab and drag teams into your predicted order, then auto-fill here."}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,flexShrink:0,flexWrap:"wrap"}}>
+          <button onClick={autoFill} style={{padding:"10px 20px",border:"none",borderRadius:8,background:"linear-gradient(135deg,"+T.goldBright+","+T.gold+")",color:"#000",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+            Auto-Fill from Groups →
+          </button>
+          <button onClick={()=>setBracket(emptyBracket())} style={{padding:"10px 16px",border:"1px solid "+T.border,borderRadius:8,background:"transparent",color:T.sub,fontFamily:"inherit",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
+            Reset ↺
+          </button>
+        </div>
+      </div>
+
+      {/* Best 3rd Place Picker — tap to select, max 4, no duplicates */}
+      {(()=>{
+        // Which 3rd-place teams are currently selected (r32 slots 12–15, team1 only)
+        const selected = [12,13,14,15].map(i=>bracket.r32[i].team1).filter(Boolean);
+
+        const toggleTeam = (team) => {
+          const idx = selected.indexOf(team);
+          if(idx !== -1){
+            // Deselect: find the slot that has this team and clear it
+            const slotIdx = [12,13,14,15].find(i=>bracket.r32[i].team1===team);
+            if(slotIdx!==undefined) setR32Team(slotIdx,"team1","");
+          } else {
+            if(selected.length >= 4) return; // max 4
+            // Find first empty slot
+            const emptySlot = [12,13,14,15].find(i=>!bracket.r32[i].team1);
+            if(emptySlot!==undefined) setR32Team(emptySlot,"team1",team);
+          }
+        };
+
+        return(
+          <div style={{marginBottom:20,background:T.card,border:"1px solid "+T.border,borderRadius:12,padding:"16px 18px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6,flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:T.text}}>Best 3rd Place Teams</div>
+                <div style={{fontSize:11,color:T.sub,marginTop:2}}>
+                  Pick <strong style={{color:T.gold}}>4 teams</strong> to advance from 3rd place — tap to select, tap again to remove.
+                  {selected.length>0&&<span style={{color:selected.length===4?T.green:T.amber}}> {selected.length}/4 selected</span>}
+                </div>
+              </div>
+              {selected.length>0&&(
+                <button
+                  onClick={()=>[12,13,14,15].forEach(i=>setR32Team(i,"team1",""))}
+                  style={{fontSize:11,color:T.muted,background:"none",border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",padding:"4px 10px"}}
+                >Clear all</button>
+              )}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:7,marginTop:12}}>
+              {thirdPlaceTeams.map(team=>{
+                const isSel=selected.includes(team);
+                const isMax=selected.length>=4&&!isSel;
                 return(
-                  <BracketCard
-                    key={m.id}
-                    match={m}
-                    onWinner={w=>setWinner("r16",i,w)}
-                    onTeamChange={(slot,team)=>setR16Team(i,slot,team)}
-                    isR16
-                    slot1Teams={slot1Teams}
-                    slot2Teams={slot2Teams}
-                    slot1Label={slot1Label}
-                    slot2Label={slot2Label}
-                  />
+                  <button
+                    key={team}
+                    onClick={()=>toggleTeam(team)}
+                    disabled={isMax}
+                    style={{
+                      display:"flex",alignItems:"center",gap:8,
+                      padding:"9px 12px",
+                      border:"1px solid "+(isSel?T.gold:T.border),
+                      borderRadius:9,
+                      background:isSel?"linear-gradient(135deg,rgba(212,175,55,0.18),rgba(212,175,55,0.08))":T.raised,
+                      cursor:isMax?"not-allowed":"pointer",
+                      opacity:isMax?0.4:1,
+                      transition:"all .12s",
+                      textAlign:"left",
+                      fontFamily:"inherit",
+                    }}
+                  >
+                    <Flag team={team} size={22} radius={3}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:isSel?700:500,color:isSel?T.gold:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</div>
+                      <div style={{fontSize:9,color:isSel?T.gold:T.muted,marginTop:1}}>
+                        {isSel?"✓ Selected":"3rd place"}
+                      </div>
+                    </div>
+                  </button>
                 );
               })}
+              {thirdPlaceTeams.length===0&&(
+                <div style={{gridColumn:"1/-1",textAlign:"center",padding:"20px 0",color:T.muted,fontSize:13}}>
+                  Go to <strong>Group Stage</strong> and set your predicted rankings first — 3rd place teams will appear here.
+                </div>
+              )}
             </div>
           </div>
-          <div style={{flex:1.5}} id="bracket-qf">
+        );
+      })()}
+
+      {/* Bracket scroll area */}
+      <div className="bracket-hint" style={{display:"none",marginBottom:12,padding:"10px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,color:T.sub}}>
+        📱 Scroll right to see the full bracket. Tap a team to advance them.
+      </div>
+
+      <div style={{overflowX:"auto",paddingBottom:16,WebkitOverflowScrolling:"touch"}}>
+        <div style={{display:"flex",gap:12,alignItems:"flex-start",minWidth:860,padding:"4px 2px"}}>
+
+          {/* R32 — two columns */}
+          <div style={{flex:"0 0 auto",width:360}} id="bracket-r32">
+            <RoundLabel>Round of 32</RoundLabel>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+              {bracket.r32.map((m,i)=>(
+                <BracketCard key={m.id} match={m} onWinner={w=>setWinner("r32",i,w)}
+                  slot1Teams={R32_MATCHUPS[i]?WC_GROUPS[R32_MATCHUPS[i][0][0]].teams:ALL_TEAMS}
+                  slot2Teams={R32_MATCHUPS[i]?WC_GROUPS[R32_MATCHUPS[i][1][0]].teams:ALL_TEAMS}
+                  onTeamChange={(slot,team)=>setR32Team(i,slot,team)} isR16/>
+              ))}
+            </div>
+          </div>
+
+          {/* R16 */}
+          <div style={{flex:"0 0 auto",width:170}} id="bracket-r16">
+            <RoundLabel>Round of 16</RoundLabel>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
+              {bracket.r16.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("r16",i,w)}/>)}
+            </div>
+          </div>
+
+          {/* QF */}
+          <div style={{flex:"0 0 auto",width:170}} id="bracket-qf">
             <RoundLabel>Quarter-Finals</RoundLabel>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
               {bracket.qf.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("qf",i,w)}/>)}
             </div>
           </div>
-          <div style={{flex:1}} id="bracket-sf">
+
+          {/* SF — exactly 2 */}
+          <div style={{flex:"0 0 auto",width:170}} id="bracket-sf">
             <RoundLabel>Semi-Finals</RoundLabel>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
               {bracket.sf.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("sf",i,w)}/>)}
             </div>
           </div>
-          <div style={{flex:.9}} id="bracket-f">
-            <RoundLabel gold>Final</RoundLabel>
+
+          {/* Final + 3rd */}
+          <div style={{flex:"0 0 auto",width:170}} id="bracket-f">
+            <RoundLabel gold>Final 🏆</RoundLabel>
             {bracket.final.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("final",i,w)} isFinal/>)}
-            <div style={{height:1,background:T.border,margin:"16px 0 8px"}}/>
-            <div style={{fontSize:10,color:T.sub,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600,marginBottom:8}}>3rd Place</div>
+            <div style={{height:1,background:T.border,margin:"14px 0 8px"}}/>
+            <div style={{fontSize:9,color:T.muted,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600,marginBottom:7}}>3rd Place</div>
             {bracket.third.map((m,i)=><BracketCard key={m.id} match={m} onWinner={w=>setWinner("third",i,w)}/>)}
           </div>
+
         </div>
       </div>
     </div>
   );
 }
+
 function RoundLabel({children,gold}){
   return(
     <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",fontWeight:700,color:gold?T.goldBright:T.muted,marginBottom:10,padding:"4px 0",display:"flex",alignItems:"center",gap:8}}>
@@ -1210,7 +1030,7 @@ function ExtrasSection({extras,setExtras}){
   const lbl={fontSize:11,fontWeight:600,letterSpacing:1.5,color:T.sub,textTransform:"uppercase",display:"block",marginBottom:8};
   return(
     <div>
-      <SectionHead label="Extra Predictions"/>
+      <SectionHead label="Extra Predictions" sub="Optional bonus picks — add as many or as few as you like."/>
       <div className="extras-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
         <div style={fw}>
           <span style={lbl}>World Cup Champion</span>
@@ -1342,7 +1162,7 @@ function loadScript(src){
 }
 
 // ─── SHARE CARD (hidden, rendered to image) ───────────────────────────────────
-function ShareCard({userName,champion,extras,bracket,groupMatches}){
+function ShareCard({userName,champion,extras,bracket,groupRankings}){
   const sf=bracket.sf.filter(m=>m.winner);
   return(
     <div style={{
@@ -1460,7 +1280,7 @@ function ShareCard({userName,champion,extras,bracket,groupMatches}){
 }
 
 // ─── SUMMARY ─────────────────────────────────────────────────────────────────
-function SummaryPage({groupMatches,bracket,extras,userName}){
+function SummaryPage({groupRankings,bracket,extras,userName}){
   const summaryRef=useRef(null);
   const shareCardRef=useRef(null);
   const [exporting,setExporting]=useState(false);
@@ -1595,7 +1415,7 @@ function SummaryPage({groupMatches,bracket,extras,userName}){
           champion={champion}
           extras={extras}
           bracket={bracket}
-          groupMatches={groupMatches}
+          groupRankings={groupRankings}
         />
       </div>
 
@@ -1703,19 +1523,19 @@ function SummaryPage({groupMatches,bracket,extras,userName}){
             </div>
           )}
           <div style={{marginBottom:24}}>
-            <div style={{fontSize:11,letterSpacing:2,color:T.sub,textTransform:"uppercase",fontWeight:600,marginBottom:14}}>Group Stage</div>
-            <div className="summary-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+            <div style={{fontSize:11,letterSpacing:2,color:T.sub,textTransform:"uppercase",fontWeight:600,marginBottom:14}}>Group Stage Predictions</div>
+            <div className="summary-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
               {Object.keys(WC_GROUPS).map(g=>{
-                const st=computeStandings(WC_GROUPS[g].teams,groupMatches[g]);
+                const ranking=groupRankings[g]||WC_GROUPS[g].teams;
                 return(
                   <div key={g} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden"}}>
-                    <div style={{padding:"7px 12px",borderBottom:`1px solid ${T.border}`,fontSize:10,fontWeight:700,letterSpacing:1.5,color:T.gold,textTransform:"uppercase"}}>Group {g}</div>
-                    {st.map((t,i)=>(
-                      <div key={t.name} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",borderBottom:i<3?`1px solid rgba(255,255,255,0.04)`:"none"}}>
-                        <span style={{fontSize:9,color:i<2?T.green:T.sub,fontWeight:700}}>{i+1}</span>
-                        <Flag team={t.name} size={14} radius={2}/>
-                        <span style={{fontSize:11,flex:1,color:i<2?T.text:T.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{teamName(t.name)}</span>
-                        <span style={{fontSize:11,fontWeight:700,color:T.sub}}>{t.pts}p</span>
+                    <div style={{padding:"6px 12px",borderBottom:`1px solid ${T.border}`,fontSize:10,fontWeight:700,letterSpacing:1.5,color:T.gold,textTransform:"uppercase"}}>Group {g}</div>
+                    {ranking.map((t,i)=>(
+                      <div key={t} style={{display:"flex",alignItems:"center",gap:7,padding:"6px 12px",borderBottom:i<3?`1px solid rgba(255,255,255,0.04)`:"none",background:i<2?"rgba(52,211,153,0.03)":"transparent"}}>
+                        <span style={{fontSize:9,color:i<2?T.green:T.muted,fontWeight:700,width:10}}>{i+1}</span>
+                        <Flag team={t} size={15} radius={2}/>
+                        <span style={{fontSize:11,flex:1,color:i<2?T.text:T.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t}</span>
+                        {i<2&&<span style={{fontSize:8,color:T.green,fontWeight:700,background:"rgba(52,211,153,0.15)",padding:"1px 5px",borderRadius:3}}>Q</span>}
                       </div>
                     ))}
                   </div>
@@ -1725,26 +1545,60 @@ function SummaryPage({groupMatches,bracket,extras,userName}){
           </div>
           <div style={{marginBottom:20}}>
             <div style={{fontSize:11,letterSpacing:2,color:T.sub,textTransform:"uppercase",fontWeight:600,marginBottom:14}}>Knockout Stage</div>
-            {[{key:"r16",label:"Round of 32"},{key:"qf",label:"Quarter-Finals"},{key:"sf",label:"Semi-Finals"},{key:"final",label:"Final"}].map(({key,label})=>{
-              const winners=bracket[key].filter(m=>m.winner);
-              if(!winners.length)return null;
-              return(
-                <div key={key} style={{marginBottom:12}}>
-                  <div style={{fontSize:10,color:T.sub,letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:600}}>{label}</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {winners.map((m,i)=>(
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",background:T.surface,border:`1px solid ${T.border}`,borderRadius:6}}>
-                        <Flag team={m.winner} size={14} radius={2}/>
-                        <span style={{fontSize:12,fontWeight:600,color:T.text}}>{teamName(m.winner)}</span>
-                      </div>
-                    ))}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[
+                {key:"r32",label:"Round of 32",cols:4},
+                {key:"r16",label:"Round of 16",cols:4},
+                {key:"qf",label:"Quarter-Finals",cols:4},
+                {key:"sf",label:"Semi-Finals",cols:2},
+                {key:"final",label:"Final",cols:1},
+              ].map(({key,label,cols})=>{
+                const winners=bracket[key]?.filter(m=>m.winner)||[];
+                if(!winners.length)return null;
+                return(
+                  <div key={key}>
+                    <div style={{fontSize:9,color:T.muted,letterSpacing:1.5,textTransform:"uppercase",marginBottom:5,fontWeight:700}}>{label}</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat("+cols+",1fr)",gap:5}}>
+                      {winners.map((m,i)=>(
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 9px",background:key==="final"?"linear-gradient(135deg,rgba(212,175,55,0.15),rgba(212,175,55,0.05))":T.surface,border:"1px solid "+(key==="final"?T.borderHi:T.border),borderRadius:6}}>
+                          <Flag team={m.winner} size={16} radius={2}/>
+                          <span style={{fontSize:11,fontWeight:key==="final"?700:600,color:key==="final"?T.gold:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.winner}</span>
+                          {key==="final"&&<span style={{fontSize:12,marginLeft:"auto"}}>🏆</span>}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
+          {/* Fun stats about the predictions */}
+          {(bracket.final[0]?.winner||extras.champion)&&(()=>{
+            const allWinners=[...bracket.r32,...bracket.r16,...bracket.qf,...bracket.sf].filter(m=>m.winner).map(m=>m.winner);
+            const freq={};allWinners.forEach(t=>{freq[t]=(freq[t]||0)+1;});
+            const topTeam=Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
+            return(
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+                {topTeam&&(
+                  <div style={{flex:1,minWidth:140,background:T.surface,border:"1px solid "+T.border,borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                    <Flag team={topTeam[0]} size={24} radius={3}/>
+                    <div>
+                      <div style={{fontSize:9,color:T.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Deepest Run</div>
+                      <div style={{fontSize:12,fontWeight:700,color:T.text}}>{topTeam[0]}</div>
+                      <div style={{fontSize:10,color:T.sub}}>{topTeam[1]} wins predicted</div>
+                    </div>
+                  </div>
+                )}
+                <div style={{flex:1,minWidth:140,background:T.surface,border:"1px solid "+T.border,borderRadius:8,padding:"10px 14px"}}>
+                  <div style={{fontSize:9,color:T.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Upsets Predicted</div>
+                  <div style={{fontSize:22,fontWeight:800,color:T.gold}}>∞</div>
+                  <div style={{fontSize:10,color:T.sub}}>Only time will tell</div>
+                </div>
+              </div>
+            );
+          })()}
           {extras.notes&&(
-            <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,padding:"14px 16px"}}>
+            <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,padding:"14px 16px",marginBottom:16}}>
               <div style={{fontSize:10,letterSpacing:1.5,color:T.sub,textTransform:"uppercase",fontWeight:600,marginBottom:8}}>Bold Predictions</div>
               <div style={{fontSize:13,color:T.text,lineHeight:1.7}}>{extras.notes}</div>
             </div>
@@ -1758,6 +1612,189 @@ function SummaryPage({groupMatches,bracket,extras,userName}){
     </div>
   );
 }
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+export default function App(){
+  const [tab,setTab]=useState("groups");
+  const [userName,setUserName]=useState("");
+  const [confetti,setConfetti]=useState(false);
+  const [groupRankings,setGroupRankings]=useState(defaultRankings);
+  const [bracket,setBracket]=useState(emptyBracket);
+  const [extras,setExtras]=useState({champion:"",goldenBoot:"",bestPlayer:"",surpriseTeam:"",flopTeam:"",notes:"",championConf:70,goldenBootConf:65});
+
+  const moveTeam=(g,fromIdx,toIdx)=>{
+    if(toIdx<0||toIdx>3)return;
+    setGroupRankings(prev=>{
+      const arr=[...prev[g]];
+      const [item]=arr.splice(fromIdx,1);
+      arr.splice(toIdx,0,item);
+      return{...prev,[g]:arr};
+    });
+  };
+
+  const setWinner=(round,idx,winner)=>{
+    setBracket(prev=>{
+      const nxt={...prev};
+      const arr=[...nxt[round]];arr[idx]={...arr[idx],winner};nxt[round]=arr;
+      const NR={r32:"r16",r16:"qf",qf:"sf",sf:"final"};
+      const nr=NR[round];
+      if(nr){
+        const na=[...nxt[nr]];
+        const ni=Math.floor(idx/2);
+        const slot=idx%2===0?"team1":"team2";
+        na[ni]={...na[ni],[slot]:winner,winner:""};nxt[nr]=na;
+        if(nr==="r16"){
+          const qa=[...nxt.qf];const qi=Math.floor(ni/2);
+          qa[qi]={...qa[qi],winner:"",[ni%2===0?"team1":"team2"]:""};nxt.qf=qa;
+          nxt.sf=nxt.sf.map(m=>({...m,winner:"",team1:"",team2:""}));
+          nxt.final=[{...nxt.final[0],winner:"",team1:"",team2:""}];
+        }
+        if(nr==="qf"){
+          const sa=[...nxt.sf];const si=Math.floor(ni/2);
+          sa[si]={...sa[si],winner:"",[ni%2===0?"team1":"team2"]:""};nxt.sf=sa;
+          nxt.final=[{...nxt.final[0],winner:""}];
+        }
+        if(nr==="sf")nxt.final=[{...nxt.final[0],winner:""}];
+      }
+      if(round==="sf"){
+        const ta=[...nxt.third];
+        const m=arr[idx];
+        const loser=m.team1===winner?m.team2:m.team1;
+        ta[0]={...ta[0],[idx===0?"team1":"team2"]:loser,winner:""};
+        nxt.third=ta;
+      }
+      return nxt;
+    });
+  };
+
+  const chaosMode=()=>{
+    const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+    const nr={};Object.keys(WC_GROUPS).forEach(g=>{nr[g]=[...WC_GROUPS[g].teams].sort(()=>Math.random()-.5);});
+    setGroupRankings(nr);
+    const nb=emptyBracket();
+    const sh=[...ALL_TEAMS].sort(()=>Math.random()-.5);
+    nb.r32=nb.r32.map((m,i)=>({...m,team1:sh[i*2%sh.length]||"TBD",team2:sh[(i*2+1)%sh.length]||"TBD"}));
+    ["r32","r16","qf","sf","final"].forEach(rd=>{
+      nb[rd]=nb[rd].map((m,i)=>{
+        const w=Math.random()>.5?m.team1:m.team2;
+        const NR={r32:"r16",r16:"qf",qf:"sf",sf:"final"};
+        if(NR[rd]&&nb[NR[rd]][Math.floor(i/2)])nb[NR[rd]][Math.floor(i/2)][i%2===0?"team1":"team2"]=w;
+        return{...m,winner:w};
+      });
+    });
+    const sf=nb.sf;
+    nb.third[0]={...nb.third[0],team1:sf[0]?.team1===sf[0]?.winner?sf[0]?.team2:sf[0]?.team1||"",team2:sf[1]?.team1===sf[1]?.winner?sf[1]?.team2:sf[1]?.team1||"",winner:pick(ALL_TEAMS)};
+    setExtras({champion:pick(ALL_TEAMS),goldenBoot:pick(PLAYERS_LIST),bestPlayer:pick(PLAYERS_LIST),surpriseTeam:pick(ALL_TEAMS),flopTeam:pick(ALL_TEAMS),notes:"Chaos Mode — all bets are off.",championConf:Math.floor(Math.random()*55)+20,goldenBootConf:Math.floor(Math.random()*55)+20});
+    setBracket(nb);setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");
+  };
+
+  const defaultR=defaultRankings();
+  const groupsCustomised=Object.keys(WC_GROUPS).some(g=>groupRankings[g].some((t,i)=>t!==defaultR[g][i]));
+
+  const TABS=[{id:"groups",label:"Group Stage"},{id:"knockout",label:"Knockout"},{id:"extras",label:"Extras"},{id:"teams",label:"Teams"},{id:"summary",label:"Summary"}];
+  const TAB_ICONS={groups:"⚽",knockout:"🏆",extras:"⭐",teams:"🌍",summary:"📋"};
+
+  return(
+    <div style={{width:"100vw",minHeight:"100vh",background:T.bg,color:T.text,fontFamily:T.ff,display:"flex",flexDirection:"column",overflowX:"hidden"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700;900&display=swap');
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html,body,#root{width:100%;min-height:100vh;overflow-x:hidden;background:#080a0f;font-family:'DM Sans',system-ui,sans-serif;}
+        ::-webkit-scrollbar{width:6px;height:6px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px;}
+        input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+        input[type=number]{-moz-appearance:textfield;}
+        select option{background:#0f1117;color:#eef0f4;}
+        select{-webkit-appearance:none;}
+        button{-webkit-tap-highlight-color:transparent;font-family:'DM Sans',system-ui,sans-serif;}
+        input,textarea,select{font-family:'DM Sans',system-ui,sans-serif;}
+        @media(max-width:640px){
+          .desktop-only{display:none!important;}
+          .mobile-nav{display:flex!important;}
+          .desktop-nav{display:none!important;}
+          .main-pad{padding:16px 12px 90px!important;}
+          .group-grid{grid-template-columns:1fr!important;}
+          .team-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .extras-grid{grid-template-columns:1fr!important;}
+          .summary-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .bracket-hint{display:block!important;}
+        }
+        @media(min-width:641px){
+          .mobile-nav{display:none!important;}
+          .mobile-only{display:none!important;}
+        }
+      `}</style>
+      <Confetti active={confetti}/>
+
+      {/* PROGRESS BAR — full width, not sticky to avoid layout issues */}
+      <div style={{padding:"8px 24px 0",background:T.bg,borderBottom:"1px solid "+T.border}}>
+        <ProgressBar groupRankings={groupRankings} bracket={bracket} extras={extras}/>
+      </div>
+
+      {/* DESKTOP HEADER */}
+      <header className="desktop-nav" style={{flexShrink:0,background:T.surface,borderBottom:"1px solid "+T.border,position:"sticky",top:0,zIndex:200}}>
+        <div style={{padding:"0 24px",display:"flex",alignItems:"center",height:54}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginRight:28,flexShrink:0}}>
+            <span style={{fontSize:20}}>🏆</span>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:T.ffd}}>WC 2026</div>
+              <div style={{fontSize:9,color:T.sub,letterSpacing:1.5,textTransform:"uppercase"}}>Predictor</div>
+            </div>
+          </div>
+          <nav style={{display:"flex",gap:0,flex:1,overflowX:"auto",height:"100%"}}>
+            {TABS.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{height:"100%",padding:"0 16px",border:"none",borderBottom:"3px solid "+(tab===t.id?T.gold:"transparent"),borderTop:"3px solid transparent",background:"transparent",color:tab===t.id?T.gold:T.sub,fontFamily:T.ff,fontSize:13,fontWeight:tab===t.id?600:400,cursor:"pointer",transition:"color .15s",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:14}}>{TAB_ICONS[t.id]}</span><span>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:12,flexShrink:0}}>
+            <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name" style={{padding:"7px 12px",background:T.raised,border:"1px solid "+T.border,borderRadius:7,color:T.text,fontFamily:T.ff,fontSize:12,width:120,outline:"none"}}/>
+            <button onClick={chaosMode} style={{padding:"7px 12px",border:"1px solid "+T.border,borderRadius:7,background:"transparent",color:T.sub,fontFamily:T.ff,fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>💀 Chaos</button>
+            <button onClick={()=>{setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");}} style={{padding:"7px 14px",border:"none",borderRadius:7,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Done ✓</button>
+          </div>
+        </div>
+      </header>
+
+      {/* MOBILE HEADER */}
+      <header className="mobile-nav" style={{flexShrink:0,background:T.surface,borderBottom:"1px solid "+T.border,position:"sticky",top:0,zIndex:200,padding:"10px 14px",alignItems:"center",justifyContent:"space-between",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:20}}>🏆</span>
+          <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:T.ffd}}>WC 2026</div>
+        </div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <input value={userName} onChange={e=>setUserName(e.target.value)} placeholder="Your name" style={{padding:"6px 10px",background:T.raised,border:"1px solid "+T.border,borderRadius:7,color:T.text,fontFamily:T.ff,fontSize:12,width:100,outline:"none"}}/>
+          <button onClick={()=>{setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");}} style={{padding:"6px 12px",border:"none",borderRadius:7,background:T.gold,color:"#000",fontFamily:T.ff,fontSize:12,fontWeight:700,cursor:"pointer"}}>Done ✓</button>
+        </div>
+      </header>
+
+      {/* CONTENT */}
+      <main className="main-pad" style={{flex:1,padding:"24px 24px 80px",maxWidth:"100%",boxSizing:"border-box"}}>
+        {tab==="groups"   && <GroupStage groupRankings={groupRankings} moveTeam={moveTeam}/>}
+        {tab==="knockout" && <KnockoutStage bracket={bracket} setWinner={setWinner} setBracket={setBracket} groupRankings={groupRankings} groupsCustomised={groupsCustomised}/>}
+        {tab==="extras"   && <ExtrasSection extras={extras} setExtras={setExtras}/>}
+        {tab==="teams"    && <TeamsSection/>}
+        {tab==="summary"  && <SummaryPage groupRankings={groupRankings} bracket={bracket} extras={extras} userName={userName}/>}
+      </main>
+
+      {/* MOBILE BOTTOM TAB BAR */}
+      <nav className="mobile-nav" style={{position:"fixed",bottom:0,left:0,right:0,zIndex:300,background:T.surface,borderTop:"1px solid "+T.border,display:"flex",alignItems:"stretch",paddingBottom:"env(safe-area-inset-bottom)"}}>
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,border:"none",background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 2px 6px",cursor:"pointer",borderTop:"2px solid "+(tab===t.id?T.gold:"transparent"),transition:"all .15s"}}>
+            <span style={{fontSize:18,lineHeight:1}}>{TAB_ICONS[t.id]}</span>
+            <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?T.gold:T.sub,letterSpacing:.3,fontFamily:T.ff,textTransform:"uppercase"}}>{t.label.split(" ")[0]}</span>
+          </button>
+        ))}
+        <button onClick={chaosMode} style={{flex:1,border:"none",background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 2px 6px",cursor:"pointer",borderTop:"2px solid transparent"}}>
+          <span style={{fontSize:18,lineHeight:1}}>💀</span>
+          <span style={{fontSize:9,color:T.sub,letterSpacing:.3,fontFamily:T.ff,textTransform:"uppercase"}}>Chaos</span>
+        </button>
+      </nav>
+    </div>
+  );
+}
+
 
 function SmallStat({label,value,conf,flag,accent}){
   return(
