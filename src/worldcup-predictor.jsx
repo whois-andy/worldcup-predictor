@@ -36,29 +36,49 @@ function teamName(raw) {
   return raw.replace(/^[\p{Emoji_Presentation}\p{Emoji}\s]+/u,"").trim();
 }
 
+// ── Flag emoji map — works on every device, no network needed ────────────────
+const FLAG_EMOJI = {
+  "Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Czechia":"🇨🇿",
+  "Canada":"🇨🇦","Bosnia-Herzegovina":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
+  "Brazil":"🇧🇷","Haiti":"🇭🇹","Morocco":"🇲🇦","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷",
+  "Germany":"🇩🇪","Curaçao":"🇨🇼","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨",
+  "Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳",
+  "Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿",
+  "Spain":"🇪🇸","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦","Uruguay":"🇺🇾",
+  "France":"🇫🇷","Iraq":"🇮🇶","Norway":"🇳🇴","Senegal":"🇸🇳",
+  "Argentina":"🇦🇷","Algeria":"🇩🇿","Austria":"🇦🇹","Jordan":"🇯🇴",
+  "Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿","Colombia":"🇨🇴",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+};
+
 function Flag({ team, size=24, radius=3 }) {
-  const code = getCode(team);
   const name = teamName(team);
+  const code = getCode(team);
+  const emoji = FLAG_EMOJI[name];
   const [imgOk, setImgOk] = React.useState(true);
 
-  if(!imgOk){
-    // Solid colored pill fallback with country code text
+  // Always try the real flag image first (looks best on desktop).
+  // If it fails (mobile/CORS/network), fall back to emoji — works everywhere.
+  if(!imgOk || !emoji){
+    // Emoji flag — renders natively on every phone and tablet
     return(
       <span style={{
+        display:"inline-flex", alignItems:"center", justifyContent:"center",
         width:size, height:Math.round(size*0.67),
         borderRadius:radius,
-        background:"rgba(255,255,255,0.1)",
-        border:"1px solid rgba(255,255,255,0.15)",
-        display:"inline-flex", alignItems:"center", justifyContent:"center",
-        flexShrink:0, fontSize:Math.max(8, size*0.38), fontWeight:700,
-        color:"rgba(255,255,255,0.6)", letterSpacing:.5,
-        verticalAlign:"middle", overflow:"hidden",
+        fontSize:Math.round(size*0.85),
+        lineHeight:1,
+        flexShrink:0,
+        verticalAlign:"middle",
+        overflow:"hidden",
       }}>
-        {code.toUpperCase().slice(0,2)}
+        {emoji || "🏳️"}
       </span>
     );
   }
-  return (
+
+  return(
     <img
       src={`https://flagcdn.com/w${Math.max(size*2,48)}/${code}.png`}
       alt={name}
