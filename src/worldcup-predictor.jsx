@@ -36,36 +36,26 @@ function teamName(raw) {
   return raw.replace(/^[\p{Emoji_Presentation}\p{Emoji}\s]+/u,"").trim();
 }
 
-// Country name → emoji flag (Unicode regional indicators, always work offline)
-const FLAG_EMOJI = {
-  "Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Czechia":"🇨🇿",
-  "Canada":"🇨🇦","Bosnia-Herzegovina":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
-  "Brazil":"🇧🇷","Haiti":"🇭🇹","Morocco":"🇲🇦","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-  "USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷",
-  "Germany":"🇩🇪","Curaçao":"🇨🇼","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨",
-  "Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳",
-  "Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿",
-  "Spain":"🇪🇸","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦","Uruguay":"🇺🇾",
-  "France":"🇫🇷","Iraq":"🇮🇶","Norway":"🇳🇴","Senegal":"🇸🇳",
-  "Argentina":"🇦🇷","Algeria":"🇩🇿","Austria":"🇦🇹","Jordan":"🇯🇴",
-  "Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿","Colombia":"🇨🇴",
-  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
-};
-
 function Flag({ team, size=24, radius=3 }) {
   const code = getCode(team);
   const name = teamName(team);
-  const emoji = FLAG_EMOJI[name] || "🏳️";
   const [imgOk, setImgOk] = React.useState(true);
 
-  // Use img from flagcdn, fall back to emoji span if it fails
   if(!imgOk){
+    // Solid colored pill fallback with country code text
     return(
       <span style={{
+        width:size, height:Math.round(size*0.67),
+        borderRadius:radius,
+        background:"rgba(255,255,255,0.1)",
+        border:"1px solid rgba(255,255,255,0.15)",
         display:"inline-flex", alignItems:"center", justifyContent:"center",
-        flexShrink:0, fontSize:size*0.9, lineHeight:1,
-        width:size, textAlign:"center",
-      }}>{emoji}</span>
+        flexShrink:0, fontSize:Math.max(8, size*0.38), fontWeight:700,
+        color:"rgba(255,255,255,0.6)", letterSpacing:.5,
+        verticalAlign:"middle", overflow:"hidden",
+      }}>
+        {code.toUpperCase().slice(0,2)}
+      </span>
     );
   }
   return (
@@ -76,7 +66,7 @@ function Flag({ team, size=24, radius=3 }) {
         width:size, height:Math.round(size*0.67),
         borderRadius:radius, objectFit:"cover",
         flexShrink:0, display:"inline-block",
-        boxShadow:"0 1px 3px rgba(0,0,0,0.4)",
+        boxShadow:"0 1px 4px rgba(0,0,0,0.4)",
         verticalAlign:"middle",
       }}
       onError={()=>setImgOk(false)}
@@ -678,11 +668,20 @@ function BracketCard({match,onWinner,onTeamChange,isFinal,isR16,slot1Teams,slot2
                 </select>
               </div>
             ):(
-              <div onClick={()=>team&&onWinner(team)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:team?"pointer":"default",opacity:lost?0.35:1,transition:"opacity .15s"}}>
+              <div
+                onClick={()=>{
+                  if(!team)return;
+                  // Prevent a team winning against itself
+                  const other=slot==="team1"?match.team2:match.team1;
+                  if(team===other&&match.winner===team)return;
+                  onWinner(team);
+                }}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"9px 10px",cursor:team?"pointer":"default",opacity:lost?0.3:1,transition:"opacity .15s"}}
+              >
                 {team&&<Flag team={team} size={20} radius={3}/>}
                 <span style={{fontSize:13,fontWeight:won?700:500,color:won?T.goldBright:team?T.text:T.muted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team||"TBD"}</span>
-                {won&&<span style={{fontSize:9,color:T.gold,fontWeight:700,background:T.goldSoft,padding:"2px 5px",borderRadius:3}}>✓</span>}
-                {team&&!match.winner&&<span style={{fontSize:9,color:T.muted}}>tap</span>}
+                {won&&<span style={{fontSize:9,color:T.gold,fontWeight:800,background:T.goldSoft,padding:"2px 6px",borderRadius:3,letterSpacing:.5}}>WIN</span>}
+                {team&&!match.winner&&<span style={{fontSize:9,color:"rgba(255,255,255,0.2)"}}>tap</span>}
               </div>
             )}
           </div>
@@ -754,18 +753,50 @@ function GroupStage({groupRankings,moveTeam}){
 function GroupRankCard({group,ranking,moveTeam}){
   const [dragging,setDragging]=React.useState(null);
   const [dragOver,setDragOver]=React.useState(null);
+  const touchDragIdx=React.useRef(null);
+  const containerRef=React.useRef(null);
+
+  // ── Desktop drag ──────────────────────────────────────────────
   const onDragStart=i=>setDragging(i);
   const onDragEnter=i=>setDragOver(i);
+  const onDragOver=e=>e.preventDefault();
   const onDragEnd=()=>{
     if(dragging!==null&&dragOver!==null&&dragging!==dragOver)moveTeam(group,dragging,dragOver);
     setDragging(null);setDragOver(null);
   };
+
+  // ── Mobile touch drag ─────────────────────────────────────────
+  const onTouchStart=(e,i)=>{
+    touchDragIdx.current=i;
+    setDragging(i);
+  };
+  const onTouchMove=(e)=>{
+    e.preventDefault(); // stop page scroll during drag
+    const touch=e.touches[0];
+    const el=document.elementFromPoint(touch.clientX,touch.clientY);
+    if(!el)return;
+    // Find the closest row with a data-idx attribute
+    const row=el.closest("[data-dragidx]");
+    if(row){
+      const idx=parseInt(row.getAttribute("data-dragidx"));
+      if(!isNaN(idx)&&idx!==touchDragIdx.current)setDragOver(idx);
+    }
+  };
+  const onTouchEnd=()=>{
+    if(touchDragIdx.current!==null&&dragOver!==null&&touchDragIdx.current!==dragOver){
+      moveTeam(group,touchDragIdx.current,dragOver);
+    }
+    touchDragIdx.current=null;
+    setDragging(null);setDragOver(null);
+  };
+
   const POS_BG=["rgba(52,211,153,0.15)","rgba(52,211,153,0.08)","rgba(96,165,250,0.08)","rgba(255,255,255,0.03)"];
   const POS_COL=[T.green,T.green,T.blue,T.muted];
-  const POS_LABEL=["1st","2nd","3rd","4th"];
-  const STATUS_LABEL=["Qualifies","Qualifies","Best 3rd?","Eliminated"];
+  const STATUS_LABEL=["Qualifies ✓","Qualifies ✓","Best 3rd?","Eliminated"];
+
   return(
     <div style={{background:T.surface,border:"1px solid "+T.border,borderRadius:14,overflow:"hidden"}}>
+      {/* Header */}
       <div style={{padding:"12px 16px",background:T.card,borderBottom:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:30,height:30,borderRadius:8,background:"rgba(212,175,55,0.12)",border:"1px solid rgba(212,175,55,0.3)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -775,35 +806,77 @@ function GroupRankCard({group,ranking,moveTeam}){
         </div>
         <div style={{display:"flex",gap:4}}>{ranking.map(t=><Flag key={t} team={t} size={18} radius={2}/>)}</div>
       </div>
+
+      {/* Sub-header */}
       <div style={{padding:"6px 12px",fontSize:10,color:T.muted,background:"rgba(255,255,255,0.02)",borderBottom:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <span>↕ Drag or use arrows to reorder</span>
-        <button onClick={()=>{WC_GROUPS[group].teams.forEach((_,i)=>moveTeam(group,ranking.indexOf(WC_GROUPS[group].teams[i]),i));}}
-          style={{fontSize:9,color:T.muted,background:"none",border:"none",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",padding:0}}>Reset ↺</button>
+        <span>Hold & drag a row — or use ▲▼ arrows</span>
+        <button
+          onClick={()=>{
+            const orig=WC_GROUPS[group].teams;
+            orig.forEach(team=>{
+              const from=ranking.indexOf(team);
+              const to=orig.indexOf(team);
+              if(from!==to)moveTeam(group,from,to);
+            });
+          }}
+          style={{fontSize:9,color:T.muted,background:"none",border:"none",cursor:"pointer",letterSpacing:.5,textTransform:"uppercase",padding:0}}
+        >Reset ↺</button>
       </div>
-      <div style={{padding:"8px"}}>
+
+      {/* Rows */}
+      <div ref={containerRef} style={{padding:"8px"}}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {ranking.map((team,i)=>(
-          <div key={team} draggable
+          <div
+            key={team}
+            data-dragidx={i}
+            draggable
             onDragStart={()=>onDragStart(i)}
             onDragEnter={()=>onDragEnter(i)}
-            onDragOver={e=>e.preventDefault()}
+            onDragOver={onDragOver}
             onDragEnd={onDragEnd}
+            onTouchStart={e=>onTouchStart(e,i)}
             style={{
-              display:"flex",alignItems:"center",gap:8,padding:"9px 10px",marginBottom:i<3?5:0,
-              borderRadius:9,background:dragging===i?"rgba(212,175,55,0.1)":dragOver===i?"rgba(255,255,255,0.07)":POS_BG[i],
-              border:"1px solid "+(dragging===i?"rgba(212,175,55,0.4)":"rgba(255,255,255,0.06)"),
-              cursor:"grab",transition:"all .1s",userSelect:"none",
-            }}>
+              display:"flex",alignItems:"center",gap:8,
+              padding:"10px 10px",marginBottom:i<3?6:0,
+              borderRadius:10,
+              background:dragging===i?"rgba(212,175,55,0.14)":dragOver===i?"rgba(255,255,255,0.09)":POS_BG[i],
+              border:"1px solid "+(dragging===i?"rgba(212,175,55,0.5)":dragOver===i?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.06)"),
+              cursor:"grab",userSelect:"none",
+              transform:dragging===i?"scale(1.01)":"scale(1)",
+              boxShadow:dragging===i?"0 4px 20px rgba(0,0,0,0.4)":"none",
+              transition:"transform .1s,box-shadow .1s,background .1s",
+              touchAction:"none", // critical for mobile touch drag
+            }}
+          >
+            {/* Position badge */}
             <div style={{width:22,height:22,borderRadius:6,flexShrink:0,background:POS_BG[i],color:POS_COL[i],fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid "+POS_COL[i]+"30"}}>{i+1}</div>
+
+            {/* Flag + name */}
             <Flag team={team} size={22} radius={3}/>
             <span style={{flex:1,fontSize:13,fontWeight:i<2?600:400,color:i<2?T.text:T.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</span>
-            <span style={{fontSize:9,fontWeight:700,color:POS_COL[i],background:POS_BG[i],padding:"2px 6px",borderRadius:10,letterSpacing:.3,flexShrink:0}}>{STATUS_LABEL[i]}</span>
+
+            {/* Status */}
+            <span style={{fontSize:9,fontWeight:700,color:POS_COL[i],background:POS_BG[i],padding:"2px 7px",borderRadius:10,flexShrink:0}}>{STATUS_LABEL[i]}</span>
+
+            {/* Arrow buttons — always visible, big touch targets on mobile */}
             <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
-              <button onClick={()=>moveTeam(group,i,i-1)} disabled={i===0}
-                style={{width:18,height:15,border:"none",borderRadius:3,background:"rgba(255,255,255,0.07)",color:i===0?T.muted:T.sub,fontSize:9,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▲</button>
-              <button onClick={()=>moveTeam(group,i,i+1)} disabled={i===3}
-                style={{width:18,height:15,border:"none",borderRadius:3,background:"rgba(255,255,255,0.07)",color:i===3?T.muted:T.sub,fontSize:9,cursor:i===3?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▼</button>
+              <button
+                onClick={e=>{e.stopPropagation();moveTeam(group,i,i-1);}}
+                disabled={i===0}
+                style={{width:24,height:18,border:"none",borderRadius:4,background:i===0?"transparent":"rgba(255,255,255,0.09)",color:i===0?T.muted:T.sub,fontSize:10,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}
+              >▲</button>
+              <button
+                onClick={e=>{e.stopPropagation();moveTeam(group,i,i+1);}}
+                disabled={i===3}
+                style={{width:24,height:18,border:"none",borderRadius:4,background:i===3?"transparent":"rgba(255,255,255,0.09)",color:i===3?T.muted:T.sub,fontSize:10,cursor:i===3?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}
+              >▼</button>
             </div>
-            <span style={{fontSize:13,color:T.muted,flexShrink:0}}>⠿</span>
+
+            {/* Drag handle */}
+            <span style={{fontSize:16,color:T.muted,flexShrink:0,cursor:"grab",lineHeight:1}}>⠿</span>
           </div>
         ))}
       </div>
@@ -813,25 +886,34 @@ function GroupRankCard({group,ranking,moveTeam}){
 }
 
 
-function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomised}){
+function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomised,extra4,setExtra4}){
 
-  // Auto-fill R32 from group rankings
+  // Auto-fill R32 from group rankings — fully clears all downstream rounds
+  // Best-3rd opponents: per WC2026 format, best-3rd teams face these group winners
+  const BEST3RD_OPPONENTS=[
+    ["F",0],["G",0],["H",0],["I",0] // 1st place of groups F,G,H,I face best-3rd teams
+  ];
   const autoFill=()=>{
     setBracket(prev=>{
-      const nb={...prev};
-      // Fill group-based slots
-      const newR32=nb.r32.map((m,i)=>{
-        const mu=R32_MATCHUPS[i];
-        if(!mu)return m;
-        const [[g1,p1],[g2,p2]]=mu;
-        return{...m,team1:groupRankings[g1]?.[p1]||"",team2:groupRankings[g2]?.[p2]||"",winner:""};
-      });
-      nb.r32=newR32;
-      nb.r16=nb.r16.map(m=>({...m,team1:"",team2:"",winner:""}));
-      nb.qf=nb.qf.map(m=>({...m,team1:"",team2:"",winner:""}));
-      nb.sf=nb.sf.map(m=>({...m,team1:"",team2:"",winner:""}));
-      nb.final=[{...nb.final[0],team1:"",team2:"",winner:""}];
-      nb.third=[{...nb.third[0],team1:"",team2:"",winner:""}];
+      const nb={
+        r32:prev.r32.map((m,i)=>{
+          const mu=R32_MATCHUPS[i];
+          if(!mu){
+            // Best 3rd slot: keep team1 (already picked by user), assign opponent
+            const oppGroup=BEST3RD_OPPONENTS[i-12];
+            const opponent=oppGroup?groupRankings[oppGroup[0]]?.[oppGroup[1]]||"":"";
+            return{...m,team2:opponent,winner:""};
+          }
+          const[[g1,p1],[g2,p2]]=mu;
+          return{...m,team1:groupRankings[g1]?.[p1]||"",team2:groupRankings[g2]?.[p2]||"",winner:""};
+        }),
+        // Wipe all downstream completely — fresh slate
+        r16:prev.r16.map(m=>({...m,team1:"",team2:"",winner:""})),
+        qf:prev.qf.map(m=>({...m,team1:"",team2:"",winner:""})),
+        sf:prev.sf.map(m=>({...m,team1:"",team2:"",winner:""})),
+        final:[{...prev.final[0],team1:"",team2:"",winner:""}],
+        third:[{...prev.third[0],team1:"",team2:"",winner:""}],
+      };
       return nb;
     });
   };
@@ -874,49 +956,61 @@ function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomi
         </div>
       </div>
 
-      {/* Best 3rd Place Picker — pick the 8 best 3rd-place teams that advance */}
+      {/* Best 8 Third-Place Picker */}
       {(()=>{
-        // In WC2026: 12 groups, top 2 = 24 through. Best 8 of 12 third-place teams also advance = 32 total.
-        // We show all 12 third-place teams. User picks 8. First 4 selected fill bracket slots 12-15.
-        const selected=[12,13,14,15].map(i=>bracket.r32[i].team1).filter(Boolean);
-
-        // We store the extra 4 (slots 5-8) in local component state won't persist to bracket
-        // Instead we use a simpler model: store 8 selected in r32 slots 12-15 as team1/team2 pairs
-        // team1 = best-3rd advancing, team2 = their group-qualified opponent (auto from autoFill)
-        // So "best8" is just team1 of slots 12-15 (4 teams in bracket) — the other 4 are shown but
-        // don't affect the bracket. We store them in a display-only list for the summary.
+        // bracket slots 12-15: first 4 best-3rd (appear in bracket)
+        const bracket4=[12,13,14,15].map(i=>bracket.r32[i].team1).filter(Boolean);
+        // extra4: 4 more best-3rd teams that advance but face each other
+        // stored in parent state so they persist across tab changes
+        const allSelected=[...bracket4,...extra4];
+        const totalSelected=allSelected.length;
 
         const toggleTeam=(team)=>{
-          const idx=selected.indexOf(team);
-          if(idx!==-1){
+          const inBracket=bracket4.includes(team);
+          const inExtra=extra4.includes(team);
+
+          if(inBracket){
+            // Remove from bracket slots
             const slotIdx=[12,13,14,15].find(i=>bracket.r32[i].team1===team);
             if(slotIdx!==undefined)setR32Team(slotIdx,"team1","");
+          } else if(inExtra){
+            // Remove from extra4
+            setExtra4(prev=>prev.filter(t=>t!==team));
           } else {
-            if(selected.length>=4)return;
-            const emptySlot=[12,13,14,15].find(i=>!bracket.r32[i].team1);
-            if(emptySlot!==undefined)setR32Team(emptySlot,"team1",team);
+            // Add: first fill bracket slots 12-15, then extra4
+            if(bracket4.length<4){
+              const emptySlot=[12,13,14,15].find(i=>!bracket.r32[i].team1);
+              if(emptySlot!==undefined)setR32Team(emptySlot,"team1",team);
+            } else if(extra4.length<4){
+              setExtra4(prev=>[...prev,team]);
+            }
+            // max 8 total — no-op if already at 8
           }
+        };
+
+        const clearAll=()=>{
+          [12,13,14,15].forEach(i=>setR32Team(i,"team1",""));
+          setExtra4([]);
         };
 
         return(
           <div style={{marginBottom:20,background:T.card,border:"1px solid "+T.border,borderRadius:12,padding:"16px 18px"}}>
-            {/* Header */}
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,flexWrap:"wrap",marginBottom:12}}>
               <div>
-                <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:3}}>Best 8 Third-Place Teams</div>
-                <div style={{fontSize:12,color:T.sub,lineHeight:1.5}}>
-                  In WC2026, the <strong style={{color:T.text}}>8 best third-place teams</strong> across all 12 groups also advance to the Round of 32.
-                  Pick which 8 you think will make it through.
+                <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:3}}>
+                  Best 8 Third-Place Teams
+                  {totalSelected>0&&<span style={{marginLeft:10,fontSize:12,color:totalSelected===8?T.green:T.amber,fontWeight:700}}>{totalSelected}/8</span>}
                 </div>
-                <div style={{fontSize:11,color:T.sub,marginTop:4}}>
-                  <span style={{color:T.gold,fontWeight:600}}>First 4 selected</span> will fill the bracket slots below. All 8 appear in your summary.
-                  {selected.length>0&&<span style={{color:selected.length===4?T.green:T.amber,fontWeight:600}}> {selected.length}/4 in bracket.</span>}
+                <div style={{fontSize:12,color:T.sub,lineHeight:1.5}}>
+                  Pick the <strong style={{color:T.text}}>8 third-place teams</strong> you think will advance.
+                  <br/>
+                  <span style={{color:T.gold}}>First 4</span> enter the bracket. <span style={{color:"#60a5fa"}}>Next 4</span> face each other in separate matches.
                 </div>
               </div>
-              {selected.length>0&&(
-                <button onClick={()=>[12,13,14,15].forEach(i=>setR32Team(i,"team1",""))}
-                  style={{fontSize:11,color:T.muted,background:"none",border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",padding:"5px 12px",whiteSpace:"nowrap"}}>
-                  Clear ↺
+              {totalSelected>0&&(
+                <button onClick={clearAll}
+                  style={{fontSize:11,color:T.muted,background:"none",border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",padding:"5px 12px",whiteSpace:"nowrap",flexShrink:0}}>
+                  Clear all ↺
                 </button>
               )}
             </div>
@@ -924,31 +1018,42 @@ function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomi
             {thirdPlaceTeams.length===0?(
               <div style={{textAlign:"center",padding:"24px 0",color:T.muted,fontSize:13}}>
                 <div style={{fontSize:28,marginBottom:8}}>⚽</div>
-                Set your group rankings first — 3rd place teams will appear here automatically.
+                Set your Group Stage rankings first — 3rd place teams appear here automatically.
               </div>
             ):(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(138px,1fr))",gap:7}}>
                 {thirdPlaceTeams.map(team=>{
-                  const bracketPos=selected.indexOf(team);
-                  const isSel=bracketPos!==-1;
-                  const isMax=selected.length>=4&&!isSel;
+                  const bIdx=bracket4.indexOf(team);
+                  const eIdx=extra4.indexOf(team);
+                  const inBracket=bIdx!==-1;
+                  const inExtra=eIdx!==-1;
+                  const isSel=inBracket||inExtra;
+                  const isMax=totalSelected>=8&&!isSel;
+
+                  // Color: gold = in bracket, blue = in extra4, grey = not selected
+                  const selColor=inBracket?T.gold:inExtra?"#60a5fa":null;
+                  const selBg=inBracket
+                    ?"linear-gradient(135deg,rgba(212,175,55,0.2),rgba(212,175,55,0.08))"
+                    :inExtra
+                    ?"linear-gradient(135deg,rgba(96,165,250,0.18),rgba(96,165,250,0.07))"
+                    :T.raised;
+
                   return(
-                    <button key={team} onClick={()=>toggleTeam(team)} disabled={isMax}
+                    <button key={team} onClick={()=>!isMax&&toggleTeam(team)}
                       style={{
-                        display:"flex",alignItems:"center",gap:9,padding:"10px 12px",
-                        border:"1px solid "+(isSel?T.gold:T.border),
+                        display:"flex",alignItems:"center",gap:8,padding:"9px 11px",
+                        border:"1px solid "+(isSel?(selColor+"60"):T.border),
                         borderRadius:10,textAlign:"left",fontFamily:"inherit",
-                        background:isSel?"linear-gradient(135deg,rgba(212,175,55,0.2),rgba(212,175,55,0.08))":T.raised,
+                        background:selBg,
                         cursor:isMax?"not-allowed":"pointer",
-                        opacity:isMax?0.38:1,
+                        opacity:isMax?0.35:1,
                         transition:"all .12s",
-                        position:"relative",
                       }}>
-                      <Flag team={team} size={24} radius={3}/>
+                      <Flag team={team} size={22} radius={3}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:isSel?700:500,color:isSel?T.goldBright:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</div>
-                        <div style={{fontSize:10,marginTop:1,color:isSel?T.gold:T.muted}}>
-                          {isSel?"Slot "+(bracketPos+1)+" ✓":"tap to pick"}
+                        <div style={{fontSize:12,fontWeight:isSel?700:400,color:isSel?selColor:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team}</div>
+                        <div style={{fontSize:9,marginTop:1,color:isSel?selColor:T.muted}}>
+                          {inBracket?"In bracket #"+(bIdx+1)+" ✓":inExtra?"Advancing #"+(eIdx+5)+" ✓":"3rd place"}
                         </div>
                       </div>
                     </button>
@@ -972,12 +1077,16 @@ function KnockoutStage({bracket,setWinner,setBracket,groupRankings,groupsCustomi
           <div style={{flex:"0 0 auto",width:360}} id="bracket-r32">
             <RoundLabel>Round of 32</RoundLabel>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
-              {bracket.r32.map((m,i)=>(
-                <BracketCard key={m.id} match={m} onWinner={w=>setWinner("r32",i,w)}
-                  slot1Teams={R32_MATCHUPS[i]?WC_GROUPS[R32_MATCHUPS[i][0][0]].teams:ALL_TEAMS}
-                  slot2Teams={R32_MATCHUPS[i]?WC_GROUPS[R32_MATCHUPS[i][1][0]].teams:ALL_TEAMS}
-                  onTeamChange={(slot,team)=>setR32Team(i,slot,team)} isR16/>
-              ))}
+              {bracket.r32.map((m,i)=>{
+                const isBestThird=i>=12; // slots 12-15 = best 3rd, no dropdowns needed
+                return(
+                  <BracketCard key={m.id} match={m} onWinner={w=>setWinner("r32",i,w)}
+                    slot1Teams={R32_MATCHUPS[i]?WC_GROUPS[R32_MATCHUPS[i][0][0]].teams:ALL_TEAMS}
+                    slot2Teams={R32_MATCHUPS[i]?WC_GROUPS[R32_MATCHUPS[i][1][0]].teams:ALL_TEAMS}
+                    onTeamChange={(slot,team)=>setR32Team(i,slot,team)}
+                    isR16={!isBestThird}/>
+                );
+              })}
             </div>
           </div>
 
@@ -1170,7 +1279,7 @@ function loadScript(src){
 }
 
 // ─── SHARE CARD (hidden, rendered to image) ───────────────────────────────────
-function ShareCard({userName,champion,extras,bracket,groupRankings}){
+function ShareCard({userName,champion,extras,bracket,groupRankings,extra4}){
   const sf=bracket.sf.filter(m=>m.winner);
   return(
     <div style={{
@@ -1288,7 +1397,7 @@ function ShareCard({userName,champion,extras,bracket,groupRankings}){
 }
 
 // ─── SUMMARY ─────────────────────────────────────────────────────────────────
-function SummaryPage({groupRankings,bracket,extras,userName}){
+function SummaryPage({groupRankings,bracket,extras,userName,extra4}){
   const summaryRef=useRef(null);
   const shareCardRef=useRef(null);
   const [exporting,setExporting]=useState(false);
@@ -1504,6 +1613,7 @@ function SummaryPage({groupRankings,bracket,extras,userName}){
           extras={extras}
           bracket={bracket}
           groupRankings={groupRankings}
+          extra4={extra4||[]}
         />
       </div>
 
@@ -1725,6 +1835,7 @@ export default function App(){
   const [groupRankings,setGroupRankings]=useState(defaultRankings);
   const [bracket,setBracket]=useState(emptyBracket);
   const [extras,setExtras]=useState({champion:"",goldenBoot:"",bestPlayer:"",surpriseTeam:"",flopTeam:"",notes:"",championConf:70,goldenBootConf:65});
+  const [extra4,setExtra4]=useState([]); // extra 4 best-3rd teams (not in bracket)
 
   const moveTeam=(g,fromIdx,toIdx)=>{
     if(toIdx<0||toIdx>3)return;
@@ -1738,35 +1849,75 @@ export default function App(){
 
   const setWinner=(round,idx,winner)=>{
     setBracket(prev=>{
-      const nxt={...prev};
-      const arr=[...nxt[round]];arr[idx]={...arr[idx],winner};nxt[round]=arr;
-      const NR={r32:"r16",r16:"qf",qf:"sf",sf:"final"};
-      const nr=NR[round];
-      if(nr){
-        const na=[...nxt[nr]];
-        const ni=Math.floor(idx/2);
-        const slot=idx%2===0?"team1":"team2";
-        na[ni]={...na[ni],[slot]:winner,winner:""};nxt[nr]=na;
-        if(nr==="r16"){
-          const qa=[...nxt.qf];const qi=Math.floor(ni/2);
-          qa[qi]={...qa[qi],winner:"",[ni%2===0?"team1":"team2"]:""};nxt.qf=qa;
-          nxt.sf=nxt.sf.map(m=>({...m,winner:"",team1:"",team2:""}));
-          nxt.final=[{...nxt.final[0],winner:"",team1:"",team2:""}];
+      // Deep-clone the entire bracket so we can mutate freely
+      const nxt={
+        r32:prev.r32.map(m=>({...m})),
+        r16:prev.r16.map(m=>({...m})),
+        qf:prev.qf.map(m=>({...m})),
+        sf:prev.sf.map(m=>({...m})),
+        final:[{...prev.final[0]}],
+        third:[{...prev.third[0]}],
+      };
+
+      // The old winner that was already set (may have cascaded downstream)
+      const oldWinner = nxt[round][idx].winner;
+
+      // Set the new winner in this round
+      nxt[round][idx].winner = winner;
+
+      // Helper: remove a team from a specific slot in a round
+      const clearTeamInSlot=(rd,matchIdx,slot)=>{
+        if(nxt[rd][matchIdx]){
+          nxt[rd][matchIdx][slot]="";
+          nxt[rd][matchIdx].winner="";
         }
-        if(nr==="qf"){
-          const sa=[...nxt.sf];const si=Math.floor(ni/2);
-          sa[si]={...sa[si],winner:"",[ni%2===0?"team1":"team2"]:""};nxt.sf=sa;
-          nxt.final=[{...nxt.final[0],winner:""}];
+      };
+
+      // Helper: recursively wipe a team from all downstream rounds
+      // starting from where it would appear after this round/match
+      const cascadeWipe=(rd,matchIdx,slot)=>{
+        clearTeamInSlot(rd,matchIdx,slot);
+        const NEXT={r32:"r16",r16:"qf",qf:"sf",sf:"final"};
+        const nextRd=NEXT[rd];
+        if(!nextRd)return;
+        const nextIdx=Math.floor(matchIdx/2);
+        const nextSlot=matchIdx%2===0?"team1":"team2";
+        cascadeWipe(nextRd,nextIdx,nextSlot);
+      };
+
+      // If we're changing an existing winner, wipe the old winner from downstream
+      if(oldWinner && oldWinner!==winner){
+        const NEXT={r32:"r16",r16:"qf",qf:"sf",sf:"final"};
+        const nextRd=NEXT[round];
+        if(nextRd){
+          const nextIdx=Math.floor(idx/2);
+          const nextSlot=idx%2===0?"team1":"team2";
+          // Only wipe downstream if the old winner actually occupies that slot
+          if(nxt[nextRd][nextIdx][nextSlot]===oldWinner){
+            cascadeWipe(nextRd,nextIdx,nextSlot);
+          }
         }
-        if(nr==="sf")nxt.final=[{...nxt.final[0],winner:""}];
       }
+
+      // Now propagate the NEW winner forward into the next round slot
+      const NEXT={r32:"r16",r16:"qf",qf:"sf",sf:"final"};
+      const nextRd=NEXT[round];
+      if(nextRd){
+        const nextIdx=Math.floor(idx/2);
+        const nextSlot=idx%2===0?"team1":"team2";
+        nxt[nextRd][nextIdx][nextSlot]=winner;
+        nxt[nextRd][nextIdx].winner=""; // reset winner since teams changed
+      }
+
+      // SF losers → 3rd place match
       if(round==="sf"){
-        const ta=[...nxt.third];
-        const m=arr[idx];
+        const m=nxt.sf[idx];
         const loser=m.team1===winner?m.team2:m.team1;
-        ta[0]={...ta[0],[idx===0?"team1":"team2"]:loser,winner:""};
-        nxt.third=ta;
+        if(idx===0) nxt.third[0].team1=loser;
+        else nxt.third[0].team2=loser;
+        nxt.third[0].winner="";
       }
+
       return nxt;
     });
   };
@@ -1789,6 +1940,7 @@ export default function App(){
     const sf=nb.sf;
     nb.third[0]={...nb.third[0],team1:sf[0]?.team1===sf[0]?.winner?sf[0]?.team2:sf[0]?.team1||"",team2:sf[1]?.team1===sf[1]?.winner?sf[1]?.team2:sf[1]?.team1||"",winner:pick(ALL_TEAMS)};
     setExtras({champion:pick(ALL_TEAMS),goldenBoot:pick(PLAYERS_LIST),bestPlayer:pick(PLAYERS_LIST),surpriseTeam:pick(ALL_TEAMS),flopTeam:pick(ALL_TEAMS),notes:"Chaos Mode — all bets are off.",championConf:Math.floor(Math.random()*55)+20,goldenBootConf:Math.floor(Math.random()*55)+20});
+    setExtra4([pick(ALL_TEAMS),pick(ALL_TEAMS),pick(ALL_TEAMS),pick(ALL_TEAMS)].filter((t,i,a)=>a.indexOf(t)===i));
     setBracket(nb);setConfetti(true);setTimeout(()=>setConfetti(false),5500);setTab("summary");
   };
 
@@ -1876,10 +2028,10 @@ export default function App(){
       {/* CONTENT */}
       <main className="main-pad" style={{flex:1,padding:"24px 24px 80px",maxWidth:"100%",boxSizing:"border-box"}}>
         {tab==="groups"   && <GroupStage groupRankings={groupRankings} moveTeam={moveTeam}/>}
-        {tab==="knockout" && <KnockoutStage bracket={bracket} setWinner={setWinner} setBracket={setBracket} groupRankings={groupRankings} groupsCustomised={groupsCustomised}/>}
+        {tab==="knockout" && <KnockoutStage bracket={bracket} setWinner={setWinner} setBracket={setBracket} groupRankings={groupRankings} groupsCustomised={groupsCustomised} extra4={extra4} setExtra4={setExtra4}/>}
         {tab==="extras"   && <ExtrasSection extras={extras} setExtras={setExtras}/>}
         {tab==="teams"    && <TeamsSection/>}
-        {tab==="summary"  && <SummaryPage groupRankings={groupRankings} bracket={bracket} extras={extras} userName={userName}/>}
+        {tab==="summary"  && <SummaryPage groupRankings={groupRankings} bracket={bracket} extras={extras} userName={userName} extra4={extra4}/>}
       </main>
 
       {/* MOBILE BOTTOM TAB BAR */}
